@@ -15,6 +15,8 @@ interface WorkoutContextType {
   startWorkout: (routineId?: string, customName?: string) => void;
   finishWorkout: () => void;
   cancelWorkout: () => void;
+  repeatWorkoutSession: (session: WorkoutSession) => void;
+  deleteWorkoutSession: (sessionId: string) => void;
   addExerciseToActiveWorkout: (exerciseId: string) => void;
   removeExerciseFromActiveWorkout: (exerciseIndex: number) => void;
   addSet: (exerciseIndex: number) => void;
@@ -37,8 +39,9 @@ interface WorkoutContextType {
   updateExercise: (updatedEx: Exercise) => void;
   deleteExercise: (exerciseId: string) => void;
 
-  // Gestión de Rutinas
+  // Gestión de Rutinas (CRUD Completo)
   createRoutine: (routine: Omit<Routine, 'id'>) => Routine;
+  updateRoutine: (routine: Routine) => void;
   deleteRoutine: (id: string) => void;
 }
 
@@ -152,11 +155,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (routine) {
       initialExercises = routine.exercises.map(tmpl => {
         const exMeta = exercises.find(e => e.id === tmpl.exerciseId);
-        const sets: WorkoutSet[] = Array.from({ length: tmpl.defaultSets }).map((_, idx) => ({
+        const sets: WorkoutSet[] = Array.from({ length: tmpl.defaultSets || 3 }).map((_, idx) => ({
           id: `set_${Date.now()}_${idx}`,
           setNumber: idx + 1,
-          weightKg: tmpl.defaultWeightKg,
-          reps: tmpl.defaultReps,
+          weightKg: tmpl.defaultWeightKg || 0,
+          reps: tmpl.defaultReps || 10,
           durationSeconds: 0,
           isCompleted: false
         }));
@@ -185,6 +188,47 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setActiveSession(session);
   }, [routines, exercises]);
+
+  // Repetir un entrenamiento del historial
+  const repeatWorkoutSession = useCallback((pastSession: WorkoutSession) => {
+    const copiedExercises: WorkoutExercise[] = pastSession.exercises.map(ex => {
+      const exMeta = exercises.find(e => e.id === ex.exerciseId);
+      const sets: WorkoutSet[] = ex.sets.map((s, idx) => ({
+        id: `set_${Date.now()}_${idx}`,
+        setNumber: idx + 1,
+        weightKg: s.weightKg,
+        reps: s.reps,
+        durationSeconds: 0,
+        isCompleted: false
+      }));
+
+      return {
+        exerciseId: ex.exerciseId,
+        exerciseName: ex.exerciseName,
+        exerciseCategory: ex.exerciseCategory,
+        exercisePhotoUrl: exMeta?.machinePhotoUrl || ex.exercisePhotoUrl,
+        targetRestSeconds: ex.targetRestSeconds || 60,
+        sets
+      };
+    });
+
+    const newSession: WorkoutSession = {
+      id: `session_${Date.now()}`,
+      routineId: pastSession.routineId,
+      name: pastSession.name,
+      date: new Date().toISOString(),
+      startTime: Date.now(),
+      totalDurationSeconds: 0,
+      exercises: copiedExercises,
+      isCompleted: false
+    };
+
+    setActiveSession(newSession);
+  }, [exercises]);
+
+  const deleteWorkoutSession = useCallback((sessionId: string) => {
+    setWorkoutHistory(prev => prev.filter(s => s.id !== sessionId));
+  }, []);
 
   // Finalizar entrenamiento
   const finishWorkout = useCallback(() => {
@@ -440,6 +484,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return newRoutine;
   }, []);
 
+  const updateRoutine = useCallback((updatedRoutine: Routine) => {
+    setRoutines(prev => prev.map(r => r.id === updatedRoutine.id ? updatedRoutine : r));
+  }, []);
+
   const deleteRoutine = useCallback((id: string) => {
     setRoutines(prev => prev.filter(r => r.id !== id));
   }, []);
@@ -454,6 +502,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       startWorkout,
       finishWorkout,
       cancelWorkout,
+      repeatWorkoutSession,
+      deleteWorkoutSession,
       addExerciseToActiveWorkout,
       removeExerciseFromActiveWorkout,
       addSet,
@@ -472,6 +522,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateExercise,
       deleteExercise,
       createRoutine,
+      updateRoutine,
       deleteRoutine
     }}>
       {children}

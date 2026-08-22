@@ -28,9 +28,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [showRestOptions, setShowRestOptions] = useState(false);
 
-  // Temporizador en vivo de ejecución de serie
+  // Temporizador en vivo de ejecución de serie (Time Under Tension)
   const [activeTimingSetIndex, setActiveTimingSetIndex] = useState<number | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
+  const setStartTimeRef = useRef<number>(0);
+  const initialDurationRef = useRef<number>(0);
 
   // Manejo del cronómetro de ejecución de la serie
   const handleToggleExecutionTimer = (setIdx: number) => {
@@ -48,10 +50,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       }
       setActiveTimingSetIndex(setIdx);
 
-      // Si estaba en 0, arranca
+      const currentDuration = exercise.sets[setIdx]?.durationSeconds || 0;
+      initialDurationRef.current = currentDuration;
+      setStartTimeRef.current = Date.now();
+
       timerIntervalRef.current = window.setInterval(() => {
-        const currentDuration = exercise.sets[setIdx]?.durationSeconds || 0;
-        updateSet(exerciseIndex, setIdx, 'durationSeconds', currentDuration + 1);
+        const elapsedSinceStart = Math.floor((Date.now() - setStartTimeRef.current) / 1000);
+        const newTotalDuration = initialDurationRef.current + elapsedSinceStart;
+        updateSet(exerciseIndex, setIdx, 'durationSeconds', newTotalDuration);
       }, 1000);
     }
   };
@@ -230,7 +236,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                       onClick={() => handleToggleExecutionTimer(setIdx)}
                       className={`flex items-center justify-center gap-1 py-1.5 px-1.5 w-full rounded-lg font-mono-numbers text-[11px] font-semibold border transition ${
                         isTiming
-                          ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse'
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse font-bold'
                           : set.durationSeconds > 0
                           ? 'bg-slate-800 text-emerald-300 border-slate-700'
                           : 'bg-slate-800/80 text-slate-400 border-slate-700/60 hover:bg-slate-700'

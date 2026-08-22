@@ -12,20 +12,22 @@ import { MobileConnectModal } from './components/common/MobileConnectModal';
 import { RoutineList } from './components/workout/RoutineList';
 import { ActiveWorkoutSession } from './components/workout/ActiveWorkoutSession';
 
-// Vistas de Seguimiento
+// Vistas de Seguimiento y Progreso
 import { ProfileTdeeCalculator } from './components/tracking/ProfileTdeeCalculator';
 import { ProgressCharts } from './components/tracking/ProgressCharts';
 import { WeeklyHistoryList } from './components/tracking/WeeklyHistoryList';
 import { WeeklyCheckInModal } from './components/tracking/WeeklyCheckInModal';
+import { TrainingProgressionView } from './components/tracking/TrainingProgressionView';
 
 // Vistas de Nutrición y Compra
 import { WeeklyMealCalendar } from './components/nutrition/WeeklyMealCalendar';
 import { ShoppingListView } from './components/shopping/ShoppingListView';
 
-import { Plus, TrendingUp, Scale, Ruler } from 'lucide-react';
+import { Plus, TrendingUp, Scale, Ruler, Dumbbell } from 'lucide-react';
 
 const MainContent: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('workout');
+  const [trackingSubTab, setTrackingSubTab] = useState<'body' | 'training'>('body');
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [isMobileConnectOpen, setIsMobileConnectOpen] = useState(false);
 
@@ -41,8 +43,8 @@ const MainContent: React.FC = () => {
         };
       case 'tracking':
         return {
-          title: 'Seguimiento y Control',
-          subtitle: `Evolución de peso, cintura y composición`
+          title: trackingSubTab === 'body' ? 'Seguimiento Corporal' : 'Progreso de Fuerza',
+          subtitle: trackingSubTab === 'body' ? 'Evolución de peso, cintura y composición' : 'Sobrecarga progresiva y récords'
         };
       case 'nutrition':
         return {
@@ -89,90 +91,129 @@ const MainContent: React.FC = () => {
           </div>
         )}
 
-        {/* Pestaña: Seguimiento y Revisiones Semanales */}
+        {/* Pestaña: Seguimiento y Progreso */}
         {currentTab === 'tracking' && (
-          <div className="space-y-5 pb-24">
-            {/* Tarjeta de Resumen Rápido de Evolución */}
-            <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            {/* Selector de Sub-pestaña: Medidas Corporales vs Progreso de Entreno */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-900 rounded-2xl border border-slate-800 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setTrackingSubTab('body')}
+                className={`py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  trackingSubTab === 'body'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Scale className="w-3.5 h-3.5" />
+                <span>Medidas y Peso</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTrackingSubTab('training')}
+                className={`py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  trackingSubTab === 'training'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Dumbbell className="w-3.5 h-3.5" />
+                <span>Progreso Gym</span>
+              </button>
+            </div>
+
+            {/* Vista 1: Medidas Corporales y Revisiones Semanales */}
+            {trackingSubTab === 'body' && (
+              <div className="space-y-5 pb-24">
+                {/* Tarjeta de Resumen Rápido de Evolución */}
+                <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 shadow-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                        Tu Evolución
+                      </span>
+                      <h2 className="text-xl font-black text-slate-100 mt-0.5">
+                        {profile.name}
+                      </h2>
+                    </div>
+
+                    <button
+                      onClick={() => setIsCheckInModalOpen(true)}
+                      className="flex items-center gap-1.5 py-2.5 px-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition active:scale-95"
+                    >
+                      <Plus className="w-4 h-4 stroke-[3]" />
+                      Nueva Revisión
+                    </button>
+                  </div>
+
+                  {/* Métricas clave: Peso actual vs Inicial y Cintura */}
+                  <div className="grid grid-cols-2 gap-2.5 pt-1">
+                    <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80">
+                      <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold">
+                        <span className="flex items-center gap-1">
+                          <Scale className="w-3 h-3 text-emerald-400" />
+                          Peso Actual
+                        </span>
+                        <span className="font-mono-numbers text-slate-500">Sem #{stats.totalWeeks}</span>
+                      </div>
+                      <div className="text-xl font-black font-mono-numbers text-slate-100 mt-1">
+                        {stats.currentWeight} <span className="text-xs text-slate-400 font-normal">kg</span>
+                      </div>
+                      <div className={`text-[11px] font-mono-numbers font-bold mt-1 ${stats.weightDelta < 0 ? 'text-emerald-400' : stats.weightDelta > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                        {stats.weightDelta > 0 ? `+${stats.weightDelta}` : stats.weightDelta} kg acumulado
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80">
+                      <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold">
+                        <span className="flex items-center gap-1">
+                          <Ruler className="w-3 h-3 text-emerald-400" />
+                          Cintura
+                        </span>
+                        <span className="font-mono-numbers text-slate-500">Grasa Visceral</span>
+                      </div>
+                      <div className="text-xl font-black font-mono-numbers text-emerald-400 mt-1">
+                        {stats.currentWaist} <span className="text-xs text-slate-400 font-normal">cm</span>
+                      </div>
+                      <div className={`text-[11px] font-mono-numbers font-bold mt-1 ${stats.waistDelta < 0 ? 'text-emerald-400' : stats.waistDelta > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                        {stats.waistDelta > 0 ? `+${stats.waistDelta}` : stats.waistDelta} cm acumulado
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gráfica de Progreso */}
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-                    Tu Evolución
-                  </span>
-                  <h2 className="text-xl font-black text-slate-100 mt-0.5">
-                    {profile.name}
-                  </h2>
+                  <h3 className="text-sm font-bold text-slate-200 mb-2.5 px-1 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    Curva de Evolución Semanal
+                  </h3>
+                  <ProgressCharts checkIns={weeklyCheckIns} />
                 </div>
 
-                <button
-                  onClick={() => setIsCheckInModalOpen(true)}
-                  className="flex items-center gap-1.5 py-2.5 px-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition active:scale-95"
-                >
-                  <Plus className="w-4 h-4 stroke-[3]" />
-                  Nueva Revisión
-                </button>
-              </div>
-
-              {/* Métricas clave: Peso actual vs Inicial y Cintura */}
-              <div className="grid grid-cols-2 gap-2.5 pt-1">
-                <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80">
-                  <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold">
-                    <span className="flex items-center gap-1">
-                      <Scale className="w-3 h-3 text-emerald-400" />
-                      Peso Actual
-                    </span>
-                    <span className="font-mono-numbers text-slate-500">Sem #{stats.totalWeeks}</span>
+                {/* Historial de Controles Semanales */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5 px-1">
+                    <h3 className="text-sm font-bold text-slate-200">
+                      Historial de Revisiones ({weeklyCheckIns.length})
+                    </h3>
                   </div>
-                  <div className="text-xl font-black font-mono-numbers text-slate-100 mt-1">
-                    {stats.currentWeight} <span className="text-xs text-slate-400 font-normal">kg</span>
-                  </div>
-                  <div className={`text-[11px] font-mono-numbers font-bold mt-1 ${stats.weightDelta < 0 ? 'text-emerald-400' : stats.weightDelta > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
-                    {stats.weightDelta > 0 ? `+${stats.weightDelta}` : stats.weightDelta} kg acumulado
-                  </div>
+                  <WeeklyHistoryList checkIns={weeklyCheckIns} />
                 </div>
 
-                <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80">
-                  <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold">
-                    <span className="flex items-center gap-1">
-                      <Ruler className="w-3 h-3 text-emerald-400" />
-                      Cintura
-                    </span>
-                    <span className="font-mono-numbers text-slate-500">Grasa Visceral</span>
-                  </div>
-                  <div className="text-xl font-black font-mono-numbers text-emerald-400 mt-1">
-                    {stats.currentWaist} <span className="text-xs text-slate-400 font-normal">cm</span>
-                  </div>
-                  <div className={`text-[11px] font-mono-numbers font-bold mt-1 ${stats.waistDelta < 0 ? 'text-emerald-400' : stats.waistDelta > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
-                    {stats.waistDelta > 0 ? `+${stats.waistDelta}` : stats.waistDelta} cm acumulado
-                  </div>
-                </div>
+                {/* Modal de Nueva Revisión */}
+                <WeeklyCheckInModal
+                  isOpen={isCheckInModalOpen}
+                  onClose={() => setIsCheckInModalOpen(false)}
+                />
               </div>
-            </div>
+            )}
 
-            {/* Gráfica de Progreso */}
-            <div>
-              <h3 className="text-sm font-bold text-slate-200 mb-2.5 px-1 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                Curva de Evolución Semanal
-              </h3>
-              <ProgressCharts checkIns={weeklyCheckIns} />
-            </div>
-
-            {/* Historial de Controles Semanales */}
-            <div>
-              <div className="flex items-center justify-between mb-2.5 px-1">
-                <h3 className="text-sm font-bold text-slate-200">
-                  Historial de Revisiones ({weeklyCheckIns.length})
-                </h3>
-              </div>
-              <WeeklyHistoryList checkIns={weeklyCheckIns} />
-            </div>
-
-            {/* Modal de Nueva Revisión */}
-            <WeeklyCheckInModal
-              isOpen={isCheckInModalOpen}
-              onClose={() => setIsCheckInModalOpen(false)}
-            />
+            {/* Vista 2: Progreso e Informes de Entrenamiento */}
+            {trackingSubTab === 'training' && (
+              <TrainingProgressionView />
+            )}
           </div>
         )}
 
