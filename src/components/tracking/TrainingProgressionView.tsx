@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { Dumbbell, TrendingUp, Trophy, Award, ChevronRight, Activity } from 'lucide-react';
+import { Dumbbell, TrendingUp, Trophy, Award, ChevronRight, Activity, Search } from 'lucide-react';
 import { useWorkout } from '../../context/WorkoutContext';
 import { estimateOneRepMax, formatSecondsToTime } from '../../services/calculations';
 import type { WorkoutSession } from '../../types/workout';
 import { WorkoutSessionDetailModal } from '../workout/WorkoutSessionDetailModal';
+import { ExerciseProgressionModal } from './ExerciseProgressionModal';
 
 export const TrainingProgressionView: React.FC = () => {
-  const { workoutHistory } = useWorkout();
+  const { workoutHistory, exercises } = useWorkout();
   const [selectedSession, setSelectedSession] = useState<WorkoutSession | null>(null);
   const [selectedRoutineFilter, setSelectedRoutineFilter] = useState<string>('all');
+  const [selectedExerciseForDetail, setSelectedExerciseForDetail] = useState<string | null>(null);
+  const [exerciseSearchTerm, setExerciseSearchTerm] = useState('');
 
   if (workoutHistory.length === 0) {
     return (
@@ -46,27 +49,40 @@ export const TrainingProgressionView: React.FC = () => {
     estimated1RM: number;
     date: string;
     photoUrl?: string;
+    timesPerformed: number;
   }
 
   const prsMap: Record<string, ExercisePR> = {};
 
   workoutHistory.forEach(s => {
     s.exercises.forEach(ex => {
+      const matchMeta = exercises.find(e => e.id === ex.exerciseId);
+      const exName = ex.exerciseName;
+
       ex.sets.forEach(set => {
         if (set.isCompleted && set.weightKg > 0) {
           const current1RM = estimateOneRepMax(set.weightKg, set.reps);
-          const existing = prsMap[ex.exerciseName];
+          const existing = prsMap[exName];
 
-          if (!existing || current1RM > existing.estimated1RM || set.weightKg > existing.maxWeightKg) {
-            prsMap[ex.exerciseName] = {
-              exerciseName: ex.exerciseName,
+          if (!existing) {
+            prsMap[exName] = {
+              exerciseName: exName,
               category: ex.exerciseCategory,
-              maxWeightKg: Math.max(existing?.maxWeightKg || 0, set.weightKg),
-              maxRepsAtWeight: set.weightKg >= (existing?.maxWeightKg || 0) ? set.reps : existing?.maxRepsAtWeight || set.reps,
-              estimated1RM: Math.max(existing?.estimated1RM || 0, current1RM),
+              maxWeightKg: set.weightKg,
+              maxRepsAtWeight: set.reps,
+              estimated1RM: current1RM,
               date: s.date,
-              photoUrl: ex.exercisePhotoUrl
+              photoUrl: ex.exercisePhotoUrl || matchMeta?.machinePhotoUrl,
+              timesPerformed: 1
             };
+          } else {
+            prsMap[exName].timesPerformed += 1;
+            if (current1RM > existing.estimated1RM || set.weightKg > existing.maxWeightKg) {
+              prsMap[exName].maxWeightKg = Math.max(existing.maxWeightKg, set.weightKg);
+              prsMap[exName].maxRepsAtWeight = set.weightKg >= existing.maxWeightKg ? set.reps : existing.maxRepsAtWeight;
+              prsMap[exName].estimated1RM = Math.max(existing.estimated1RM, current1RM);
+              prsMap[exName].date = s.date;
+            }
           }
         }
       });
@@ -74,6 +90,11 @@ export const TrainingProgressionView: React.FC = () => {
   });
 
   const prsList = Object.values(prsMap).sort((a, b) => b.estimated1RM - a.estimated1RM);
+
+  const filteredPrs = prsList.filter(p =>
+    p.exerciseName.toLowerCase().includes(exerciseSearchTerm.toLowerCase()) ||
+    p.category.toLowerCase().includes(exerciseSearchTerm.toLowerCase())
+  );
 
   // 3. Agrupación por Rutinas y Comparativa de Sobrecarga Progresiva
   const routineGroups: Record<string, WorkoutSession[]> = {};
@@ -123,7 +144,7 @@ export const TrainingProgressionView: React.FC = () => {
           </div>
         </div>
 
-        {/* 4 Métricas Clave */}
+        {/* Métricas Clave */}
         <div className="grid grid-cols-2 gap-2.5 font-mono-numbers">
           <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
             <div className="flex items-center gap-1 text-[10px] text-slate-400 uppercase font-bold">
@@ -150,6 +171,77 @@ export const TrainingProgressionView: React.FC = () => {
               {totalLifetimeSets} series efectivas
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Sección: Evolución de Ejercicios y Récords Personales (PRs) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-amber-400" />
+            <h3 className="text-sm font-bold text-slate-200">
+              Evolución y Récords por Ejercicio
+            </h3>
+          </div>
+          <span className="text-xs text-slate-400 font-mono-numbers">
+            {prsList.length} registrados
+          </span>
+        </div>
+
+        {/* Buscador de Ejercicio */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Buscar ejercicio para ver su avance histórico..."
+            value={exerciseSearchTerm}
+            onChange={(e) => setExerciseSearchTerm(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-10 pr-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {filteredPrs.map(pr => (
+            <div
+              key={pr.exerciseName}
+              onClick={() => setSelectedExerciseForDetail(pr.exerciseName)}
+              className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5 shadow hover:border-emerald-500/50 cursor-pointer transition group"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center text-xs font-bold text-slate-400 flex-shrink-0">
+                    {pr.photoUrl ? (
+                      <img src={pr.photoUrl} alt={pr.exerciseName} className="w-full h-full object-cover" />
+                    ) : (
+                      <Dumbbell className="w-4 h-4 text-slate-500" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-slate-100 leading-tight group-hover:text-emerald-400 transition truncate">
+                      {pr.exerciseName}
+                    </h4>
+                    <span className="text-[10px] text-slate-400">
+                      {pr.category}
+                    </span>
+                  </div>
+                </div>
+
+                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-mono-numbers font-extrabold text-[11px] border border-amber-500/20 flex-shrink-0">
+                  1RM: ~{pr.estimated1RM} kg
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs font-mono-numbers">
+                <span className="text-slate-400">
+                  Récord: <strong className="text-emerald-400">{pr.maxWeightKg} kg × {pr.maxRepsAtWeight} reps</strong>
+                </span>
+
+                <span className="text-[11px] text-slate-500 group-hover:text-emerald-400 flex items-center gap-0.5 transition font-sans font-semibold">
+                  Ver avance <ChevronRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -230,7 +322,7 @@ export const TrainingProgressionView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Pasos / Historial de esta rutina */}
+                  {/* Historial de esta rutina */}
                   <div className="space-y-2">
                     {sessions.map((sess, idx) => {
                       const prevSess = sessions[idx - 1];
@@ -290,51 +382,6 @@ export const TrainingProgressionView: React.FC = () => {
         </div>
       </div>
 
-      {/* Sección: Récords Personales (PRs) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-amber-400" />
-            <h3 className="text-sm font-bold text-slate-200">
-              Récords Personales y 1RM Estimado
-            </h3>
-          </div>
-          <span className="text-xs text-slate-400 font-mono-numbers">
-            {prsList.length} ejercicios
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {prsList.map(pr => (
-            <div
-              key={pr.exerciseName}
-              className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-100 leading-tight">
-                    {pr.exerciseName}
-                  </h4>
-                  <span className="text-[10px] text-slate-400">
-                    {pr.category}
-                  </span>
-                </div>
-
-                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-mono-numbers font-extrabold text-[11px] border border-amber-500/20">
-                  1RM: ~{pr.estimated1RM} kg
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-xs font-mono-numbers">
-                <span className="text-slate-400">
-                  Mejor Serie: <strong className="text-emerald-400">{pr.maxWeightKg} kg × {pr.maxRepsAtWeight} reps</strong>
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Sección: Distribución de Volumen por Grupo Muscular */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 shadow-md space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
@@ -366,11 +413,19 @@ export const TrainingProgressionView: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal de Detalle de Sesión */}
+      {/* Modal de Detalle de Sesión del Historial */}
       <WorkoutSessionDetailModal
         isOpen={!!selectedSession}
         onClose={() => setSelectedSession(null)}
         session={selectedSession}
+      />
+
+      {/* Modal de Evolución de Ejercicio Específico */}
+      <ExerciseProgressionModal
+        isOpen={!!selectedExerciseForDetail}
+        onClose={() => setSelectedExerciseForDetail(null)}
+        exerciseName={selectedExerciseForDetail || ''}
+        workoutHistory={workoutHistory}
       />
     </div>
   );

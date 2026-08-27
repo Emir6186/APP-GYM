@@ -1,14 +1,17 @@
 import React from 'react';
-import { Calendar, Ruler, Scale, Trash2, TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { Calendar, Ruler, Scale, Trash2, TrendingDown, TrendingUp, Minus, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
 import type { WeeklyCheckIn } from '../../types/tracking';
 import { useTracking } from '../../context/TrackingContext';
+import { useNutrition } from '../../context/NutritionContext';
+import { auditWeeklyProgress } from '../../services/calculations';
 
 interface WeeklyHistoryListProps {
   checkIns: WeeklyCheckIn[];
 }
 
 export const WeeklyHistoryList: React.FC<WeeklyHistoryListProps> = ({ checkIns }) => {
-  const { deleteWeeklyCheckIn } = useTracking();
+  const { deleteWeeklyCheckIn, applyCalorieAdjustment, profile } = useTracking();
+  const { generateNewPlan } = useNutrition();
 
   // Ordenar de más reciente a más antiguo
   const sorted = [...checkIns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -22,6 +25,11 @@ export const WeeklyHistoryList: React.FC<WeeklyHistoryListProps> = ({ checkIns }
       </div>
     );
   }
+
+  const handleApplyAdjustment = (delta: number) => {
+    applyCalorieAdjustment(delta);
+    generateNewPlan();
+  };
 
   return (
     <div className="space-y-3">
@@ -41,6 +49,9 @@ export const WeeklyHistoryList: React.FC<WeeklyHistoryListProps> = ({ checkIns }
           month: 'short',
           year: 'numeric'
         });
+
+        // Auditoría nutricional calculada
+        const audit = item.auditResult || auditWeeklyProgress(item, nextOlder, profile.goal);
 
         return (
           <div
@@ -110,6 +121,43 @@ export const WeeklyHistoryList: React.FC<WeeklyHistoryListProps> = ({ checkIns }
                 </div>
               </div>
             </div>
+
+            {/* Auditoría Nutricional y Control Inteligente de Progreso */}
+            {audit && (
+              <div className={`p-3 rounded-xl border text-xs space-y-2 ${
+                audit.status === 'optimal'
+                  ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                  : audit.status === 'slow'
+                  ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+                  : audit.status === 'fast'
+                  ? 'bg-rose-950/20 border-rose-500/30 text-rose-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-300'
+              }`}>
+                <div className="flex items-center gap-1.5 font-bold">
+                  {audit.status === 'optimal' ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  )}
+                  <span>{audit.title}</span>
+                </div>
+
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  {audit.message}
+                </p>
+
+                {/* Botón de acción para aplicar ajuste calórico inteligente si procede */}
+                {audit.recommendedCalorieDelta !== 0 && (
+                  <button
+                    onClick={() => handleApplyAdjustment(audit.recommendedCalorieDelta)}
+                    className="mt-1 w-full py-2 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] transition shadow flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
+                    Aplicar Ajuste a mi Dieta ({audit.recommendedCalorieDelta > 0 ? `+${audit.recommendedCalorieDelta}` : audit.recommendedCalorieDelta} kcal)
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Medidas secundarias opcionales */}
             {(item.chestCm || item.armCm || item.thighCm || item.bodyFatPercentage) && (

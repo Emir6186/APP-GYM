@@ -66,10 +66,13 @@ const DEFAULT_USER_PROFILE: UserProfile = {
   age: 26,
   gender: 'male',
   weightKg: 78.5,
+  startWeightKg: 80.4,
+  targetWeightKg: 74.0,
   heightCm: 178,
   trainingDaysPerWeek: 4,
   activityLevel: 'moderate',
-  goal: 'deficit_moderate' // -500 kcal
+  goal: 'deficit_moderate', // -500 kcal
+  startDate: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString()
 };
 
 // Revisiones semanales de ejemplo
@@ -193,7 +196,13 @@ export const storageService = {
       return DEFAULT_USER_PROFILE;
     }
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return {
+        ...DEFAULT_USER_PROFILE,
+        ...parsed,
+        startWeightKg: parsed.startWeightKg ?? parsed.weightKg ?? 80.0,
+        targetWeightKg: parsed.targetWeightKg ?? (parsed.weightKg ? parsed.weightKg - 5 : 74.0)
+      };
     } catch {
       return DEFAULT_USER_PROFILE;
     }

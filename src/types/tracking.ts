@@ -14,11 +14,14 @@ export interface UserProfile {
   name: string;
   age: number;
   gender: Gender;
-  weightKg: number;
+  weightKg: number;              // Peso actual
+  startWeightKg: number;         // Peso de comienzo
+  targetWeightKg: number;        // Peso al que se quiere llegar (Objetivo)
   heightCm: number;
   trainingDaysPerWeek: number;
   activityLevel: ActivityLevel;
   goal: FitnessGoal;
+  startDate?: string;
 }
 
 export interface CalculatedMetrics {
@@ -31,6 +34,25 @@ export interface CalculatedMetrics {
   fatGrams: number;       // Gramos de grasas diarias
   waterLiters: number;    // Litros recomendados de agua al día
   fiberGrams: number;     // Gramos de fibra
+  
+  // Escalada de progreso estimada
+  totalWeightDeltaKg: number;       // Kg a perder o ganar (target - current)
+  estimatedWeeksToGoal: number;     // Semanas estimadas para llegar a la meta
+  recommendedWeeklyRateKg: number;  // Ritmo saludable recomendado por semana (ej. 0.5 kg)
+}
+
+export interface WeightRoadmapStep {
+  weekNumber: number;
+  projectedWeightKg: number;
+  dateStr: string;
+}
+
+export interface ProgressAudit {
+  status: 'optimal' | 'slow' | 'fast' | 'on_track';
+  title: string;
+  message: string;
+  recommendedCalorieDelta: number; // -150, +150, 0
+  weeklyLossOrGainKg: number;
 }
 
 export interface WeeklyCheckIn {
@@ -48,4 +70,5 @@ export interface WeeklyCheckIn {
   notes?: string;
   energyLevel?: number;      // 1-5
   trainingCompliance?: number; // % cumplido
+  auditResult?: ProgressAudit;
 }

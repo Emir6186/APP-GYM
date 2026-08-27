@@ -4,6 +4,14 @@ import { storageService } from '../services/storage';
 import { playCountdownTick, playRestCompleteSound, playSetCompleteSound } from '../services/audioService';
 import confetti from 'canvas-confetti';
 
+interface LastExerciseHistory {
+  lastWeightKg: number;
+  lastReps: number;
+  lastSetsCount: number;
+  lastDateStr?: string;
+  bestWeightKg: number;
+}
+
 interface WorkoutContextType {
   exercises: Exercise[];
   routines: Routine[];
@@ -25,6 +33,7 @@ interface WorkoutContextType {
   completeSet: (exerciseIndex: number, setIndex: number) => void;
   uncompleteSet: (exerciseIndex: number, setIndex: number) => void;
   updateExerciseTargetRest: (exerciseIndex: number, seconds: number) => void;
+  getLastExercisePerformance: (exerciseId: string) => LastExerciseHistory | null;
   
   // Acciones del Temporizador de Descanso
   startRestTimer: (seconds: number, exerciseName: string, setNumber: number) => void;
@@ -80,6 +89,48 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     storageService.saveActiveSession(activeSession);
   }, [activeSession]);
 
+  // Helper para buscar el último rendimiento histórico de un ejercicio
+  const getLastExercisePerformance = useCallback((exerciseId: string): LastExerciseHistory | null => {
+    if (workoutHistory.length === 0) return null;
+
+    let bestWeight = 0;
+    let foundLast: { weight: number; reps: number; setsCount: number; dateStr?: string } | null = null;
+
+    // Recorrer de más reciente a más antiguo
+    for (const session of workoutHistory) {
+      const match = session.exercises.find(e => e.exerciseId === exerciseId);
+      if (match && match.sets.length > 0) {
+        const completedSets = match.sets.filter(s => s.isCompleted);
+        const setPool = completedSets.length > 0 ? completedSets : match.sets;
+        const lastSet = setPool[setPool.length - 1];
+
+        if (!foundLast && lastSet) {
+          foundLast = {
+            weight: lastSet.weightKg,
+            reps: lastSet.reps,
+            setsCount: match.sets.length,
+            dateStr: new Date(session.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+          };
+        }
+
+        // Buscar el peso máximo histórico
+        setPool.forEach(s => {
+          if (s.weightKg > bestWeight) bestWeight = s.weightKg;
+        });
+      }
+    }
+
+    if (!foundLast) return null;
+
+    return {
+      lastWeightKg: foundLast.weight,
+      lastReps: foundLast.reps,
+      lastSetsCount: foundLast.setsCount,
+      lastDateStr: foundLast.dateStr,
+      bestWeightKg: Math.max(bestWeight, foundLast.weight)
+    };
+  }, [workoutHistory]);
+
   // Cronómetro del temporizador de descanso
   const restTimerRef = useRef<number | null>(null);
 
@@ -88,12 +139,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       restTimerRef.current = window.setInterval(() => {
         setRestTimer(prev => {
           if (prev.remainingSeconds <= 1) {
-            // Fin del descanso
             playRestCompleteSound();
             return { ...prev, isActive: false, remainingSeconds: 0 };
           }
           if (prev.remainingSeconds <= 4 && prev.remainingSeconds >= 2) {
-            // Aviso de cuenta atrás (3, 2, 1)
             playCountdownTick();
           }
           return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
@@ -147,7 +196,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setRestTimer(prev => ({ ...prev, isActive: false, remainingSeconds: 0 }));
   }, []);
 
-  // Iniciar entrenamiento
+  // Iniciar entrenamiento con memoria histórica de cargas
   const startWorkout = useCallback((routineId?: string, customName?: string) => {
     const routine = routines.find(r => r.id === routineId);
     let initialExercises: WorkoutExercise[] = [];
@@ -155,11 +204,17 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (routine) {
       initialExercises = routine.exercises.map(tmpl => {
         const exMeta = exercises.find(e => e.id === tmpl.exerciseId);
-        const sets: WorkoutSet[] = Array.from({ length: tmpl.defaultSets || 3 }).map((_, idx) => ({
+        const lastPerf = getLastExercisePerformance(tmpl.exerciseId);
+
+        const defaultWeight = lastPerf ? lastPerf.lastWeightKg : (tmpl.defaultWeightKg || 0);
+        const defaultReps = lastPerf ? lastPerf.lastReps : (tmpl.defaultReps || 10);
+        const setsCount = tmpl.defaultSets || (lastPerf ? lastPerf.lastSetsCount : 4);
+
+        const sets: WorkoutSet[] = Array.from({ length: setsCount }).map((_, idx) => ({
           id: `set_${Date.now()}_${idx}`,
           setNumber: idx + 1,
-          weightKg: tmpl.defaultWeightKg || 0,
-          reps: tmpl.defaultReps || 10,
+          weightKg: defaultWeight,
+          reps: defaultReps,
           durationSeconds: 0,
           isCompleted: false
         }));
@@ -187,17 +242,19 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     setActiveSession(session);
-  }, [routines, exercises]);
+  }, [routines, exercises, getLastExercisePerformance]);
 
   // Repetir un entrenamiento del historial
   const repeatWorkoutSession = useCallback((pastSession: WorkoutSession) => {
     const copiedExercises: WorkoutExercise[] = pastSession.exercises.map(ex => {
       const exMeta = exercises.find(e => e.id === ex.exerciseId);
+      const lastPerf = getLastExercisePerformance(ex.exerciseId);
+
       const sets: WorkoutSet[] = ex.sets.map((s, idx) => ({
         id: `set_${Date.now()}_${idx}`,
         setNumber: idx + 1,
-        weightKg: s.weightKg,
-        reps: s.reps,
+        weightKg: lastPerf ? lastPerf.lastWeightKg : s.weightKg,
+        reps: lastPerf ? lastPerf.lastReps : s.reps,
         durationSeconds: 0,
         isCompleted: false
       }));
@@ -224,7 +281,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     setActiveSession(newSession);
-  }, [exercises]);
+  }, [exercises, getLastExercisePerformance]);
 
   const deleteWorkoutSession = useCallback((sessionId: string) => {
     setWorkoutHistory(prev => prev.filter(s => s.id !== sessionId));
@@ -262,7 +319,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setActiveSession(null);
     skipRestTimer();
 
-    // Animación de celebración con confeti
     try {
       confetti({
         particleCount: 100,
@@ -279,11 +335,25 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     skipRestTimer();
   }, [skipRestTimer]);
 
-  // Añadir ejercicio a sesión activa
+  // Añadir ejercicio a sesión activa con memoria del último peso/reps
   const addExerciseToActiveWorkout = useCallback((exerciseId: string) => {
     if (!activeSession) return;
     const exMeta = exercises.find(e => e.id === exerciseId);
     if (!exMeta) return;
+
+    const lastPerf = getLastExercisePerformance(exerciseId);
+    const initialWeight = lastPerf ? lastPerf.lastWeightKg : 20;
+    const initialReps = lastPerf ? lastPerf.lastReps : 10;
+    const initialSetsCount = lastPerf ? lastPerf.lastSetsCount : 4;
+
+    const sets: WorkoutSet[] = Array.from({ length: initialSetsCount }).map((_, idx) => ({
+      id: `set_${Date.now()}_${idx + 1}`,
+      setNumber: idx + 1,
+      weightKg: initialWeight,
+      reps: initialReps,
+      durationSeconds: 0,
+      isCompleted: false
+    }));
 
     const newExercise: WorkoutExercise = {
       exerciseId: exMeta.id,
@@ -291,16 +361,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       exerciseCategory: exMeta.category,
       exercisePhotoUrl: exMeta.machinePhotoUrl,
       targetRestSeconds: exMeta.defaultRestSeconds || 60,
-      sets: [
-        {
-          id: `set_${Date.now()}_1`,
-          setNumber: 1,
-          weightKg: 20,
-          reps: 10,
-          durationSeconds: 0,
-          isCompleted: false
-        }
-      ]
+      sets
     };
 
     setActiveSession(prev => {
@@ -310,7 +371,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         exercises: [...prev.exercises, newExercise]
       };
     });
-  }, [activeSession, exercises]);
+  }, [activeSession, exercises, getLastExercisePerformance]);
 
   const removeExerciseFromActiveWorkout = useCallback((exerciseIndex: number) => {
     setActiveSession(prev => {
@@ -348,7 +409,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!prev) return null;
       const updated = [...prev.exercises];
       const targetEx = { ...updated[exerciseIndex] };
-      if (targetEx.sets.length <= 1) return prev; // Mantener al menos 1 serie
+      if (targetEx.sets.length <= 1) return prev;
 
       targetEx.sets = targetEx.sets.filter((_, idx) => idx !== setIndex).map((s, idx) => ({
         ...s,
@@ -441,10 +502,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Actualizar avatar/foto de la máquina para un ejercicio
   const updateExerciseMachinePhoto = useCallback((exerciseId: string, photoUrl: string) => {
-    // Actualizar catálogo de ejercicios
     setExercises(prev => prev.map(ex => ex.id === exerciseId ? { ...ex, machinePhotoUrl: photoUrl } : ex));
 
-    // Si hay una sesión activa con este ejercicio, actualizarla también
     setActiveSession(prev => {
       if (!prev) return null;
       const updated = prev.exercises.map(ex => {
@@ -512,6 +571,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       completeSet,
       uncompleteSet,
       updateExerciseTargetRest,
+      getLastExercisePerformance,
       startRestTimer,
       pauseRestTimer,
       resumeRestTimer,
