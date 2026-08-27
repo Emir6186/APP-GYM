@@ -91,31 +91,32 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Helper para buscar el último rendimiento histórico de un ejercicio
   const getLastExercisePerformance = useCallback((exerciseId: string): LastExerciseHistory | null => {
-    if (workoutHistory.length === 0) return null;
+    if (!workoutHistory || workoutHistory.length === 0) return null;
 
     let bestWeight = 0;
     let foundLast: { weight: number; reps: number; setsCount: number; dateStr?: string } | null = null;
 
     // Recorrer de más reciente a más antiguo
     for (const session of workoutHistory) {
-      const match = session.exercises.find(e => e.exerciseId === exerciseId);
-      if (match && match.sets.length > 0) {
-        const completedSets = match.sets.filter(s => s.isCompleted);
+      if (!session || !session.exercises) continue;
+      const match = session.exercises.find(e => e && e.exerciseId === exerciseId);
+      if (match && match.sets && match.sets.length > 0) {
+        const completedSets = match.sets.filter(s => s && s.isCompleted);
         const setPool = completedSets.length > 0 ? completedSets : match.sets;
         const lastSet = setPool[setPool.length - 1];
 
         if (!foundLast && lastSet) {
           foundLast = {
-            weight: lastSet.weightKg,
-            reps: lastSet.reps,
+            weight: lastSet.weightKg || 0,
+            reps: lastSet.reps || 0,
             setsCount: match.sets.length,
-            dateStr: new Date(session.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+            dateStr: session.date ? new Date(session.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : undefined
           };
         }
 
         // Buscar el peso máximo histórico
         setPool.forEach(s => {
-          if (s.weightKg > bestWeight) bestWeight = s.weightKg;
+          if (s && s.weightKg && s.weightKg > bestWeight) bestWeight = s.weightKg;
         });
       }
     }
@@ -202,7 +203,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let initialExercises: WorkoutExercise[] = [];
 
     if (routine) {
-      initialExercises = routine.exercises.map(tmpl => {
+      initialExercises = (routine.exercises || []).map(tmpl => {
         const exMeta = exercises.find(e => e.id === tmpl.exerciseId);
         const lastPerf = getLastExercisePerformance(tmpl.exerciseId);
 
@@ -242,15 +243,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     setActiveSession(session);
+    storageService.saveActiveSession(session);
   }, [routines, exercises, getLastExercisePerformance]);
 
   // Repetir un entrenamiento del historial
   const repeatWorkoutSession = useCallback((pastSession: WorkoutSession) => {
-    const copiedExercises: WorkoutExercise[] = pastSession.exercises.map(ex => {
+    const copiedExercises: WorkoutExercise[] = (pastSession.exercises || []).map(ex => {
       const exMeta = exercises.find(e => e.id === ex.exerciseId);
       const lastPerf = getLastExercisePerformance(ex.exerciseId);
 
-      const sets: WorkoutSet[] = ex.sets.map((s, idx) => ({
+      const sets: WorkoutSet[] = (ex.sets || []).map((s, idx) => ({
         id: `set_${Date.now()}_${idx}`,
         setNumber: idx + 1,
         weightKg: lastPerf ? lastPerf.lastWeightKg : s.weightKg,
@@ -281,33 +283,53 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     setActiveSession(newSession);
+    storageService.saveActiveSession(newSession);
   }, [exercises, getLastExercisePerformance]);
 
   const deleteWorkoutSession = useCallback((sessionId: string) => {
-    setWorkoutHistory(prev => prev.filter(s => s.id !== sessionId));
+    setWorkoutHistory(prev => {
+      const updated = prev.filter(s => s.id !== sessionId);
+      storageService.saveWorkoutHistory(updated);
+      return updated;
+    });
   }, []);
 
-  // Finalizar entrenamiento
+  // Finalizar entrenamiento de forma segura y síncrona
   const finishWorkout = useCallback(() => {
     if (!activeSession) return;
 
     let totalVolume = 0;
     let completedSetsCount = 0;
 
-    activeSession.exercises.forEach(ex => {
-      ex.sets.forEach(set => {
-        if (set.isCompleted) {
-          totalVolume += (set.weightKg * set.reps);
+    const safeExercises = (activeSession.exercises || []).map(ex => {
+      const safeSets = (ex.sets || []).map(set => {
+        if (set && set.isCompleted) {
+          totalVolume += ((set.weightKg || 0) * (set.reps || 0));
           completedSetsCount++;
         }
+        return {
+          id: set?.id || `set_${Date.now()}`,
+          setNumber: set?.setNumber || 1,
+          weightKg: set?.weightKg || 0,
+          reps: set?.reps || 0,
+          durationSeconds: set?.durationSeconds || 0,
+          isCompleted: !!set?.isCompleted,
+          completedAt: set?.completedAt
+        };
       });
+
+      return {
+        ...ex,
+        sets: safeSets
+      };
     });
 
     const endTime = Date.now();
-    const duration = Math.round((endTime - activeSession.startTime) / 1000);
+    const duration = Math.max(0, Math.round((endTime - (activeSession.startTime || endTime)) / 1000));
 
     const completedSession: WorkoutSession = {
       ...activeSession,
+      exercises: safeExercises,
       endTime,
       totalDurationSeconds: duration,
       isCompleted: true,
@@ -315,23 +337,31 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       totalSetsCompleted: completedSetsCount
     };
 
-    setWorkoutHistory(prev => [completedSession, ...prev]);
+    // Actualizar estado e inmediatamente limpiar localStorage de la sesión activa
+    setWorkoutHistory(prev => {
+      const updated = [completedSession, ...prev];
+      storageService.saveWorkoutHistory(updated);
+      return updated;
+    });
+
     setActiveSession(null);
+    storageService.saveActiveSession(null);
     skipRestTimer();
 
     try {
       confetti({
-        particleCount: 100,
-        spread: 70,
+        particleCount: 80,
+        spread: 60,
         origin: { y: 0.6 }
       });
     } catch {
-      // Ignorar si falla
+      // Ignorar
     }
   }, [activeSession, skipRestTimer]);
 
   const cancelWorkout = useCallback(() => {
     setActiveSession(null);
+    storageService.saveActiveSession(null);
     skipRestTimer();
   }, [skipRestTimer]);
 
@@ -366,90 +396,105 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setActiveSession(prev => {
       if (!prev) return null;
-      return {
+      const updated = {
         ...prev,
-        exercises: [...prev.exercises, newExercise]
+        exercises: [...(prev.exercises || []), newExercise]
       };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
   }, [activeSession, exercises, getLastExercisePerformance]);
 
   const removeExerciseFromActiveWorkout = useCallback((exerciseIndex: number) => {
     setActiveSession(prev => {
       if (!prev) return null;
-      const updated = [...prev.exercises];
-      updated.splice(exerciseIndex, 1);
-      return { ...prev, exercises: updated };
+      const updatedList = [...(prev.exercises || [])];
+      updatedList.splice(exerciseIndex, 1);
+      const updated = { ...prev, exercises: updatedList };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
   }, []);
 
   const addSet = useCallback((exerciseIndex: number) => {
     setActiveSession(prev => {
-      if (!prev) return null;
-      const updated = [...prev.exercises];
-      const targetEx = { ...updated[exerciseIndex] };
-      const lastSet = targetEx.sets[targetEx.sets.length - 1];
+      if (!prev || !prev.exercises || !prev.exercises[exerciseIndex]) return null;
+      const updatedList = [...prev.exercises];
+      const targetEx = { ...updatedList[exerciseIndex] };
+      const exSets = targetEx.sets || [];
+      const lastSet = exSets[exSets.length - 1];
 
       const newSet: WorkoutSet = {
-        id: `set_${Date.now()}_${targetEx.sets.length + 1}`,
-        setNumber: targetEx.sets.length + 1,
+        id: `set_${Date.now()}_${exSets.length + 1}`,
+        setNumber: exSets.length + 1,
         weightKg: lastSet ? lastSet.weightKg : 20,
         reps: lastSet ? lastSet.reps : 10,
         durationSeconds: 0,
         isCompleted: false
       };
 
-      targetEx.sets = [...targetEx.sets, newSet];
-      updated[exerciseIndex] = targetEx;
-      return { ...prev, exercises: updated };
+      targetEx.sets = [...exSets, newSet];
+      updatedList[exerciseIndex] = targetEx;
+      const updated = { ...prev, exercises: updatedList };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
   }, []);
 
   const removeSet = useCallback((exerciseIndex: number, setIndex: number) => {
     setActiveSession(prev => {
-      if (!prev) return null;
-      const updated = [...prev.exercises];
-      const targetEx = { ...updated[exerciseIndex] };
-      if (targetEx.sets.length <= 1) return prev;
+      if (!prev || !prev.exercises || !prev.exercises[exerciseIndex]) return null;
+      const updatedList = [...prev.exercises];
+      const targetEx = { ...updatedList[exerciseIndex] };
+      const exSets = targetEx.sets || [];
+      if (exSets.length <= 1) return prev;
 
-      targetEx.sets = targetEx.sets.filter((_, idx) => idx !== setIndex).map((s, idx) => ({
+      targetEx.sets = exSets.filter((_, idx) => idx !== setIndex).map((s, idx) => ({
         ...s,
         setNumber: idx + 1
       }));
 
-      updated[exerciseIndex] = targetEx;
-      return { ...prev, exercises: updated };
+      updatedList[exerciseIndex] = targetEx;
+      const updated = { ...prev, exercises: updatedList };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
   }, []);
 
   const updateSet = useCallback((exerciseIndex: number, setIndex: number, field: 'weightKg' | 'reps' | 'durationSeconds', value: number) => {
     setActiveSession(prev => {
-      if (!prev) return null;
-      const updated = [...prev.exercises];
-      const targetEx = { ...updated[exerciseIndex] };
-      const updatedSets = [...targetEx.sets];
+      if (!prev || !prev.exercises || !prev.exercises[exerciseIndex]) return null;
+      const updatedList = [...prev.exercises];
+      const targetEx = { ...updatedList[exerciseIndex] };
+      const updatedSets = [...(targetEx.sets || [])];
       
+      if (!updatedSets[setIndex]) return prev;
+
       updatedSets[setIndex] = {
         ...updatedSets[setIndex],
         [field]: Math.max(0, value)
       };
 
       targetEx.sets = updatedSets;
-      updated[exerciseIndex] = targetEx;
-      return { ...prev, exercises: updated };
+      updatedList[exerciseIndex] = targetEx;
+      const updated = { ...prev, exercises: updatedList };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
   }, []);
 
-  // Completar Serie: Guarda estado, reproduce sonido y lanza el temporizador de descanso
+  // Completar Serie
   const completeSet = useCallback((exerciseIndex: number, setIndex: number) => {
-    if (!activeSession) return;
+    if (!activeSession || !activeSession.exercises || !activeSession.exercises[exerciseIndex]) return;
     const targetEx = activeSession.exercises[exerciseIndex];
-    if (!targetEx) return;
 
     setActiveSession(prev => {
-      if (!prev) return null;
-      const updated = [...prev.exercises];
-      const currentEx = { ...updated[exerciseIndex] };
-      const updatedSets = [...currentEx.sets];
+      if (!prev || !prev.exercises || !prev.exercises[exerciseIndex]) return null;
+      const updatedList = [...prev.exercises];
+      const currentEx = { ...updatedList[exerciseIndex] };
+      const updatedSets = [...(currentEx.sets || [])];
+
+      if (!updatedSets[setIndex]) return prev;
 
       updatedSets[setIndex] = {
         ...updatedSets[setIndex],
@@ -458,23 +503,26 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
 
       currentEx.sets = updatedSets;
-      updated[exerciseIndex] = currentEx;
-      return { ...prev, exercises: updated };
+      updatedList[exerciseIndex] = currentEx;
+      const updated = { ...prev, exercises: updatedList };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
 
     playSetCompleteSound();
 
-    // Activar inmediatamente el descanso estipulado
     const restSec = targetEx.targetRestSeconds || 60;
     startRestTimer(restSec, targetEx.exerciseName, setIndex + 1);
   }, [activeSession, startRestTimer]);
 
   const uncompleteSet = useCallback((exerciseIndex: number, setIndex: number) => {
     setActiveSession(prev => {
-      if (!prev) return null;
-      const updated = [...prev.exercises];
-      const currentEx = { ...updated[exerciseIndex] };
-      const updatedSets = [...currentEx.sets];
+      if (!prev || !prev.exercises || !prev.exercises[exerciseIndex]) return null;
+      const updatedList = [...prev.exercises];
+      const currentEx = { ...updatedList[exerciseIndex] };
+      const updatedSets = [...(currentEx.sets || [])];
+
+      if (!updatedSets[setIndex]) return prev;
 
       updatedSets[setIndex] = {
         ...updatedSets[setIndex],
@@ -483,20 +531,24 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
 
       currentEx.sets = updatedSets;
-      updated[exerciseIndex] = currentEx;
-      return { ...prev, exercises: updated };
+      updatedList[exerciseIndex] = currentEx;
+      const updated = { ...prev, exercises: updatedList };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
   }, []);
 
   const updateExerciseTargetRest = useCallback((exerciseIndex: number, seconds: number) => {
     setActiveSession(prev => {
-      if (!prev) return null;
-      const updated = [...prev.exercises];
-      updated[exerciseIndex] = {
-        ...updated[exerciseIndex],
+      if (!prev || !prev.exercises || !prev.exercises[exerciseIndex]) return null;
+      const updatedList = [...prev.exercises];
+      updatedList[exerciseIndex] = {
+        ...updatedList[exerciseIndex],
         targetRestSeconds: seconds
       };
-      return { ...prev, exercises: updated };
+      const updated = { ...prev, exercises: updatedList };
+      storageService.saveActiveSession(updated);
+      return updated;
     });
   }, []);
 
@@ -505,7 +557,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setExercises(prev => prev.map(ex => ex.id === exerciseId ? { ...ex, machinePhotoUrl: photoUrl } : ex));
 
     setActiveSession(prev => {
-      if (!prev) return null;
+      if (!prev || !prev.exercises) return null;
       const updated = prev.exercises.map(ex => {
         if (ex.exerciseId === exerciseId) {
           return { ...ex, exercisePhotoUrl: photoUrl };

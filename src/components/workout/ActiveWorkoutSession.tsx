@@ -32,17 +32,20 @@ export const ActiveWorkoutSession: React.FC = () => {
 
   if (!activeSession) return null;
 
-  // Calcular métricas en vivo
+  // Calcular métricas en vivo de forma segura
   let totalVolumeKg = 0;
   let totalSets = 0;
   let completedSets = 0;
 
-  activeSession.exercises.forEach(ex => {
-    ex.sets.forEach(set => {
+  const safeExercises = activeSession.exercises || [];
+
+  safeExercises.forEach(ex => {
+    const exSets = ex?.sets || [];
+    exSets.forEach(set => {
       totalSets++;
-      if (set.isCompleted) {
+      if (set && set.isCompleted) {
         completedSets++;
-        totalVolumeKg += (set.weightKg * set.reps);
+        totalVolumeKg += ((set.weightKg || 0) * (set.reps || 0));
       }
     });
   });

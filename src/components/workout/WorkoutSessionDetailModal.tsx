@@ -20,19 +20,23 @@ export const WorkoutSessionDetailModal: React.FC<WorkoutSessionDetailModalProps>
 
   if (!session) return null;
 
-  const dateFormatted = new Date(session.date).toLocaleDateString('es-ES', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  const dateFormatted = session.date 
+    ? new Date(session.date).toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      })
+    : 'Fecha reciente';
 
-  const totalVolume = session.totalVolumeKg || session.exercises.reduce((acc, ex) => {
-    return acc + ex.sets.reduce((sAcc, s) => s.isCompleted ? sAcc + (s.weightKg * s.reps) : sAcc, 0);
+  const sessionExercises = session.exercises || [];
+
+  const totalVolume = session.totalVolumeKg ?? sessionExercises.reduce((acc, ex) => {
+    return acc + (ex?.sets || []).reduce((sAcc, s) => s?.isCompleted ? sAcc + ((s.weightKg || 0) * (s.reps || 0)) : sAcc, 0);
   }, 0);
 
-  const completedSetsCount = session.totalSetsCompleted || session.exercises.reduce((acc, ex) => {
-    return acc + ex.sets.filter(s => s.isCompleted).length;
+  const completedSetsCount = session.totalSetsCompleted ?? sessionExercises.reduce((acc, ex) => {
+    return acc + (ex?.sets || []).filter(s => s?.isCompleted).length;
   }, 0);
 
   const handleRepeat = () => {
@@ -51,7 +55,7 @@ export const WorkoutSessionDetailModal: React.FC<WorkoutSessionDetailModalProps>
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={session.name}
+      title={session.name || 'Detalle de Sesión'}
       subtitle={dateFormatted}
       maxWidth="lg"
     >
@@ -65,7 +69,7 @@ export const WorkoutSessionDetailModal: React.FC<WorkoutSessionDetailModalProps>
                 Duración
               </span>
               <div className="text-sm sm:text-base font-black text-slate-100 mt-0.5">
-                {formatSecondsToTime(session.totalDurationSeconds)}
+                {formatSecondsToTime(session.totalDurationSeconds || 0)}
               </div>
             </div>
 
@@ -95,12 +99,13 @@ export const WorkoutSessionDetailModal: React.FC<WorkoutSessionDetailModalProps>
         <div className="space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
             <Dumbbell className="w-4 h-4 text-emerald-400" />
-            Ejercicios Realizados ({session.exercises.length})
+            Ejercicios Realizados ({sessionExercises.length})
           </h4>
 
           <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-            {session.exercises.map((ex, exIdx) => {
-              const exVolume = ex.sets.reduce((acc, s) => s.isCompleted ? acc + (s.weightKg * s.reps) : acc, 0);
+            {sessionExercises.map((ex, exIdx) => {
+              const exSets = ex?.sets || [];
+              const exVolume = exSets.reduce((acc, s) => s?.isCompleted ? acc + ((s.weightKg || 0) * (s.reps || 0)) : acc, 0);
 
               return (
                 <div
@@ -114,7 +119,7 @@ export const WorkoutSessionDetailModal: React.FC<WorkoutSessionDetailModalProps>
                         {ex.exercisePhotoUrl ? (
                           <img src={ex.exercisePhotoUrl} alt={ex.exerciseName} className="w-full h-full object-cover" />
                         ) : (
-                          ex.exerciseName.charAt(0)
+                          (ex.exerciseName || 'E').charAt(0)
                         )}
                       </div>
                       <div>
@@ -138,28 +143,28 @@ export const WorkoutSessionDetailModal: React.FC<WorkoutSessionDetailModalProps>
                       <span>Serie</span>
                       <span>Kg</span>
                       <span>Reps</span>
-                      <span>Tiempo</span>
+                      <span>Estado</span>
                     </div>
 
                     <div className="space-y-1.5 mt-1.5 font-mono-numbers text-xs text-center">
-                      {ex.sets.map((set) => (
+                      {exSets.map((set, sIdx) => (
                         <div
-                          key={set.id}
+                          key={set?.id || `set_${sIdx}`}
                           className={`grid grid-cols-4 gap-2 py-1.5 px-2 rounded-lg items-center ${
-                            set.isCompleted ? 'bg-slate-900/80 text-slate-200' : 'bg-slate-950 text-slate-500 line-through'
+                            set?.isCompleted ? 'bg-slate-900/80 text-slate-200' : 'bg-slate-950 text-slate-500 line-through'
                           }`}
                         >
                           <span className="font-bold text-emerald-400 text-left pl-2">
-                            #{set.setNumber}
+                            #{set?.setNumber || sIdx + 1}
                           </span>
                           <span className="font-bold text-slate-100">
-                            {set.weightKg} kg
+                            {set?.weightKg || 0} kg
                           </span>
                           <span className="font-bold text-slate-100">
-                            {set.reps} reps
+                            {set?.reps || 0} reps
                           </span>
-                          <span className="text-slate-400 text-[11px]">
-                            {set.durationSeconds > 0 ? `${set.durationSeconds}s` : '-'}
+                          <span className={`text-[11px] font-sans font-semibold ${set?.isCompleted ? 'text-emerald-400' : 'text-slate-500'}`}>
+                            {set?.isCompleted ? 'Completada' : 'Pendiente'}
                           </span>
                         </div>
                       ))}

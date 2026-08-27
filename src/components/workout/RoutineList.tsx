@@ -28,6 +28,9 @@ export const RoutineList: React.FC = () => {
     }
   };
 
+  const safeHistory = Array.isArray(workoutHistory) ? workoutHistory : [];
+  const safeRoutines = Array.isArray(routines) ? routines : [];
+
   return (
     <div className="space-y-6 pb-24">
       {/* Hero Banner: Iniciar Sesión Rápida */}
@@ -43,7 +46,7 @@ export const RoutineList: React.FC = () => {
             Supera tus marcas de hoy
           </h2>
           <p className="text-xs text-emerald-100/80 mt-1 max-w-xs">
-            Cronometra tus series, controla el tiempo de descanso y fotografía tus máquinas.
+            Cronometra tus descansos, pre-rellena tus pesos y fotografía tus máquinas.
           </p>
 
           <div className="flex gap-2.5 mt-5">
@@ -76,7 +79,7 @@ export const RoutineList: React.FC = () => {
               Tus Rutinas
             </h3>
             <span className="text-xs font-mono-numbers px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800">
-              {routines.length}
+              {safeRoutines.length}
             </span>
           </div>
 
@@ -92,7 +95,7 @@ export const RoutineList: React.FC = () => {
           </button>
         </div>
 
-        {routines.length === 0 ? (
+        {safeRoutines.length === 0 ? (
           <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-center text-slate-400 space-y-2">
             <Dumbbell className="w-8 h-8 text-slate-600 mx-auto" />
             <p className="text-xs font-semibold text-slate-300">No tienes ninguna rutina creada</p>
@@ -110,66 +113,72 @@ export const RoutineList: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {routines.map(routine => (
-              <div
-                key={routine.id}
-                className="rounded-2xl bg-slate-900 border border-slate-800 p-4 hover:border-slate-700 transition shadow-md group space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <h4 className="text-base font-bold text-slate-100 group-hover:text-emerald-400 transition truncate">
-                      {routine.name}
-                    </h4>
-                    {routine.description && (
-                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
-                        {routine.description}
-                      </p>
-                    )}
+            {safeRoutines.map(routine => {
+              if (!routine) return null;
+              const routineExercises = routine.exercises || [];
+              const muscleGroups = routine.muscleGroups || [];
 
-                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                      {routine.muscleGroups.map(mg => (
-                        <span
-                          key={mg}
-                          className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-950 text-slate-300 border border-slate-800"
-                        >
-                          {mg}
+              return (
+                <div
+                  key={routine.id}
+                  className="rounded-2xl bg-slate-900 border border-slate-800 p-4 hover:border-slate-700 transition shadow-md group space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <h4 className="text-base font-bold text-slate-100 group-hover:text-emerald-400 transition truncate">
+                        {routine.name}
+                      </h4>
+                      {routine.description && (
+                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                          {routine.description}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                        {muscleGroups.map(mg => (
+                          <span
+                            key={mg}
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-950 text-slate-300 border border-slate-800"
+                          >
+                            {mg}
+                          </span>
+                        ))}
+                        <span className="text-[10px] text-slate-400 font-mono-numbers">
+                          • {routineExercises.length} ejercicios
                         </span>
-                      ))}
-                      <span className="text-[10px] text-slate-400 font-mono-numbers">
-                        • {routine.exercises.length} ejercicios
-                      </span>
+                      </div>
+                    </div>
+
+                    {/* Acciones de Rutina: Editar, Borrar, Iniciar */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={(e) => handleEditRoutine(e, routine)}
+                        className="p-2 rounded-xl bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800 transition"
+                        title="Editar rutina"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => handleDeleteRoutineClick(e, routine)}
+                        className="p-2 rounded-xl bg-slate-950 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 border border-slate-800 transition"
+                        title="Eliminar rutina"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => startWorkout(routine.id, routine.name)}
+                        className="p-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 transition active:scale-95 ml-1"
+                        title="Iniciar esta rutina"
+                      >
+                        <Play className="w-4 h-4 fill-slate-950" />
+                      </button>
                     </div>
                   </div>
-
-                  {/* Acciones de Rutina: Editar, Borrar, Iniciar */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={(e) => handleEditRoutine(e, routine)}
-                      className="p-2 rounded-xl bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800 transition"
-                      title="Editar rutina"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      onClick={(e) => handleDeleteRoutineClick(e, routine)}
-                      className="p-2 rounded-xl bg-slate-950 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 border border-slate-800 transition"
-                      title="Eliminar rutina"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      onClick={() => startWorkout(routine.id, routine.name)}
-                      className="p-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 transition active:scale-95 ml-1"
-                      title="Iniciar esta rutina"
-                    >
-                      <Play className="w-4 h-4 fill-slate-950" />
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -184,11 +193,11 @@ export const RoutineList: React.FC = () => {
             </h3>
           </div>
           <span className="text-xs text-slate-400 font-medium font-mono-numbers">
-            {workoutHistory.length} registradas
+            {safeHistory.length} registradas
           </span>
         </div>
 
-        {workoutHistory.length === 0 ? (
+        {safeHistory.length === 0 ? (
           <div className="text-center py-8 rounded-2xl bg-slate-900/40 border border-slate-800/60 p-4">
             <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
             <p className="text-xs text-slate-400">Aún no has completado ninguna sesión.</p>
@@ -196,25 +205,30 @@ export const RoutineList: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-2.5">
-            {workoutHistory.map(session => {
-              const dateFormatted = new Date(session.date).toLocaleDateString('es-ES', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short'
-              });
+            {safeHistory.map(session => {
+              if (!session) return null;
+              
+              const sessionExercises = session.exercises || [];
+              const dateFormatted = session.date
+                ? new Date(session.date).toLocaleDateString('es-ES', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short'
+                  })
+                : 'Sesión reciente';
 
-              const completedSetsCount = session.totalSetsCompleted || session.exercises.reduce((acc, e) => acc + e.sets.filter(s => s.isCompleted).length, 0);
-              const volume = session.totalVolumeKg || session.exercises.reduce((acc, e) => acc + e.sets.reduce((sAcc, s) => s.isCompleted ? sAcc + (s.weightKg * s.reps) : sAcc, 0), 0);
+              const completedSetsCount = session.totalSetsCompleted ?? sessionExercises.reduce((acc, e) => acc + (e?.sets || []).filter(s => s?.isCompleted).length, 0);
+              const volume = session.totalVolumeKg ?? sessionExercises.reduce((acc, e) => acc + (e?.sets || []).reduce((sAcc, s) => s?.isCompleted ? sAcc + ((s.weightKg || 0) * (s.reps || 0)) : sAcc, 0), 0);
 
               return (
                 <div
-                  key={session.id}
+                  key={session.id || `session_${Math.random()}`}
                   onClick={() => setSelectedHistorySession(session)}
                   className="rounded-2xl bg-slate-900 border border-slate-800 p-3.5 flex items-center justify-between hover:border-emerald-500/40 cursor-pointer transition shadow group"
                 >
                   <div className="flex-1 min-w-0 pr-2">
                     <h5 className="text-sm font-bold text-slate-100 group-hover:text-emerald-400 transition truncate">
-                      {session.name}
+                      {session.name || 'Entrenamiento'}
                     </h5>
                     <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 font-mono-numbers">
                       <span className="flex items-center gap-1">
@@ -222,7 +236,7 @@ export const RoutineList: React.FC = () => {
                         {dateFormatted}
                       </span>
                       <span>
-                        ⏱️ {formatSecondsToTime(session.totalDurationSeconds)}
+                        ⏱️ {formatSecondsToTime(session.totalDurationSeconds || 0)}
                       </span>
                       <span className="text-emerald-400 font-bold">
                         💪 {volume.toLocaleString()} kg

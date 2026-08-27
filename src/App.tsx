@@ -7,6 +7,7 @@ import { BottomNav } from './components/common/BottomNav';
 import type { NavTab } from './components/common/BottomNav';
 import { RestTimerOverlay } from './components/common/RestTimerOverlay';
 import { MobileConnectModal } from './components/common/MobileConnectModal';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Vistas de Entrenamiento
 import { RoutineList } from './components/workout/RoutineList';
@@ -253,14 +254,17 @@ const MainContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <TrackingProvider>
-      <WorkoutProvider>
-        <NutritionProvider>
-          <MainContent />
-        </NutritionProvider>
-      </WorkoutProvider>
-    </TrackingProvider>
+    <ErrorBoundary>
+      <TrackingProvider>
+        <WorkoutProvider>
+          <NutritionProvider>
+            <MainContent />
+          </NutritionProvider>
+        </WorkoutProvider>
+      </TrackingProvider>
+    </ErrorBoundary>
   );
 };
 
 export default App;
+
