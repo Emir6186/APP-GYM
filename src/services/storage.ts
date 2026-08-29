@@ -130,7 +130,8 @@ export const storageService = {
       return DEFAULT_EXERCISES;
     }
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : DEFAULT_EXERCISES;
     } catch {
       return DEFAULT_EXERCISES;
     }
@@ -139,7 +140,7 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEYS.EXERCISES, JSON.stringify(exercises));
   },
 
-  // Rutinas
+  // Rutinas sanitizadas
   getRoutines(): Routine[] {
     const raw = localStorage.getItem(STORAGE_KEYS.ROUTINES);
     if (!raw) {
@@ -147,7 +148,21 @@ export const storageService = {
       return DEFAULT_ROUTINES;
     }
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return DEFAULT_ROUTINES;
+      return parsed.map(r => ({
+        ...r,
+        id: r?.id || `routine_${Date.now()}`,
+        name: r?.name || 'Rutina',
+        muscleGroups: Array.isArray(r?.muscleGroups) ? r.muscleGroups : ['Pecho'],
+        exercises: Array.isArray(r?.exercises) ? r.exercises.map((e: any) => ({
+          exerciseId: e?.exerciseId || `ex_${Date.now()}`,
+          defaultSets: e?.defaultSets || 4,
+          defaultReps: e?.defaultReps || 10,
+          defaultWeightKg: e?.defaultWeightKg || 0,
+          targetRestSeconds: e?.targetRestSeconds || 60
+        })) : []
+      }));
     } catch {
       return DEFAULT_ROUTINES;
     }
@@ -156,12 +171,28 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
   },
 
-  // Historial de Entrenamientos
+  // Historial de Entrenamientos sanitizado
   getWorkoutHistory(): WorkoutSession[] {
     const raw = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
     if (!raw) return [];
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(s => ({
+        ...s,
+        id: s?.id || `session_${Date.now()}`,
+        name: s?.name || 'Entrenamiento',
+        date: s?.date || new Date().toISOString(),
+        totalDurationSeconds: s?.totalDurationSeconds || 0,
+        exercises: Array.isArray(s?.exercises) ? s.exercises.map((e: any) => ({
+          ...e,
+          exerciseId: e?.exerciseId || `ex_${Date.now()}`,
+          exerciseName: e?.exerciseName || 'Ejercicio',
+          exerciseCategory: e?.exerciseCategory || 'General',
+          targetRestSeconds: e?.targetRestSeconds || 60,
+          sets: Array.isArray(e?.sets) ? e.sets : []
+        })) : []
+      }));
     } catch {
       return [];
     }
@@ -170,12 +201,37 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(history));
   },
 
-  // Sesión Activa de Entrenamiento
+  // Sesión Activa de Entrenamiento sanitizada
   getActiveSession(): WorkoutSession | null {
     const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION);
     if (!raw) return null;
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return {
+        ...parsed,
+        id: parsed.id || `session_${Date.now()}`,
+        name: parsed.name || 'Entrenamiento',
+        date: parsed.date || new Date().toISOString(),
+        startTime: parsed.startTime || Date.now(),
+        totalDurationSeconds: parsed.totalDurationSeconds || 0,
+        exercises: Array.isArray(parsed.exercises) ? parsed.exercises.map((e: any) => ({
+          ...e,
+          exerciseId: e?.exerciseId || `ex_${Date.now()}`,
+          exerciseName: e?.exerciseName || 'Ejercicio',
+          exerciseCategory: e?.exerciseCategory || 'General',
+          targetRestSeconds: e?.targetRestSeconds || 60,
+          sets: Array.isArray(e?.sets) ? e.sets.map((s: any, sIdx: number) => ({
+            id: s?.id || `set_${Date.now()}_${sIdx}`,
+            setNumber: s?.setNumber || sIdx + 1,
+            weightKg: s?.weightKg || 0,
+            reps: s?.reps || 0,
+            durationSeconds: s?.durationSeconds || 0,
+            isCompleted: !!s?.isCompleted,
+            completedAt: s?.completedAt
+          })) : []
+        })) : []
+      };
     } catch {
       return null;
     }
@@ -219,7 +275,8 @@ export const storageService = {
       return DEFAULT_CHECKINS;
     }
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : DEFAULT_CHECKINS;
     } catch {
       return DEFAULT_CHECKINS;
     }
@@ -260,7 +317,8 @@ export const storageService = {
       return initialShopping;
     }
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }

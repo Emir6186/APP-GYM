@@ -29,11 +29,18 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [showRestOptions, setShowRestOptions] = useState(false);
 
+  const exName = exercise?.exerciseName || 'Ejercicio';
+  const exCategory = exercise?.exerciseCategory || 'Pecho';
+  const targetRest = exercise?.targetRestSeconds || 60;
+  const setsList = Array.isArray(exercise?.sets) ? exercise.sets : [];
+
   // Obtener la última marca histórica para mostrar como referencia
-  const lastPerf = getLastExercisePerformance(exercise.exerciseId);
+  const lastPerf = exercise?.exerciseId ? getLastExercisePerformance(exercise.exerciseId) : null;
 
   const handleCompleteSetAction = (setIdx: number) => {
-    if (exercise.sets[setIdx].isCompleted) {
+    if (!setsList[setIdx]) return;
+
+    if (setsList[setIdx].isCompleted) {
       uncompleteSet(exerciseIndex, setIdx);
     } else {
       completeSet(exerciseIndex, setIdx);
@@ -49,15 +56,15 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             {/* Avatar / Foto de la máquina con botón de cámara */}
             <div className="relative group flex-shrink-0">
               <div className="w-13 h-13 rounded-xl bg-slate-950 border border-slate-700 overflow-hidden flex items-center justify-center shadow-inner">
-                {exercise.exercisePhotoUrl ? (
+                {exercise?.exercisePhotoUrl ? (
                   <img
                     src={exercise.exercisePhotoUrl}
-                    alt={exercise.exerciseName}
+                    alt={exName}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-base">
-                    {exercise.exerciseName.charAt(0)}
+                    {exName.charAt(0)}
                   </div>
                 )}
               </div>
@@ -74,12 +81,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-100 leading-tight truncate">
-                {exercise.exerciseName}
+                {exName}
               </h3>
               
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-medium border border-slate-700">
-                  {exercise.exerciseCategory}
+                  {exCategory}
                 </span>
 
                 {/* Botón de descanso configurado */}
@@ -89,7 +96,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                   className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 font-semibold border border-emerald-500/30 hover:bg-emerald-900/50 transition font-mono-numbers"
                 >
                   <Timer className="w-3 h-3" />
-                  <span>{exercise.targetRestSeconds}s descanso</span>
+                  <span>{targetRest}s descanso</span>
                   {showRestOptions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               </div>
@@ -118,7 +125,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         {showRestOptions && (
           <div className="p-3 bg-slate-950/70 border-b border-slate-800 animate-fadeIn">
             <RestOptionsSelector
-              currentRestSeconds={exercise.targetRestSeconds}
+              currentRestSeconds={targetRest}
               onSelectRest={(sec) => {
                 updateExerciseTargetRest(exerciseIndex, sec);
                 setShowRestOptions(false);
@@ -139,10 +146,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
           {/* Filas de Series */}
           <div className="space-y-2 mt-1">
-            {exercise.sets.map((set, setIdx) => {
+            {setsList.map((set, setIdx) => {
+              if (!set) return null;
+
               return (
                 <div
-                  key={set.id}
+                  key={set.id || `set_${setIdx}`}
                   className={`grid grid-cols-12 gap-2 items-center p-2 rounded-xl border transition ${
                     set.isCompleted
                       ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-100'
@@ -156,7 +165,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                         ? 'bg-emerald-500 text-slate-950' 
                         : 'bg-slate-800 text-slate-300'
                     }`}>
-                      #{set.setNumber}
+                      #{set.setNumber || setIdx + 1}
                     </span>
                   </div>
 
@@ -167,7 +176,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                       min="0"
                       step="0.5"
                       disabled={set.isCompleted}
-                      value={set.weightKg === 0 ? '' : set.weightKg}
+                      value={set.weightKg === 0 ? '' : (set.weightKg ?? '')}
                       onChange={(e) => updateSet(exerciseIndex, setIdx, 'weightKg', parseFloat(e.target.value) || 0)}
                       placeholder="Kg"
                       className="w-full bg-slate-900 border border-slate-700/80 rounded-xl py-2 px-2 text-center font-mono-numbers font-black text-sm text-slate-100 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
@@ -180,7 +189,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                       type="number"
                       min="1"
                       disabled={set.isCompleted}
-                      value={set.reps === 0 ? '' : set.reps}
+                      value={set.reps === 0 ? '' : (set.reps ?? '')}
                       onChange={(e) => updateSet(exerciseIndex, setIdx, 'reps', parseInt(e.target.value, 10) || 0)}
                       placeholder="Reps"
                       className="w-full bg-slate-900 border border-slate-700/80 rounded-xl py-2 px-2 text-center font-mono-numbers font-black text-sm text-slate-100 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
@@ -218,10 +227,10 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
               Añadir Serie
             </button>
 
-            {exercise.sets.length > 1 && (
+            {setsList.length > 1 && (
               <button
                 type="button"
-                onClick={() => removeSet(exerciseIndex, exercise.sets.length - 1)}
+                onClick={() => removeSet(exerciseIndex, setsList.length - 1)}
                 className="text-[11px] text-slate-500 hover:text-rose-400 transition"
               >
                 Quitar última serie
@@ -235,9 +244,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       <CameraModal
         isOpen={isCameraOpen}
         onClose={() => setIsCameraOpen(false)}
-        exerciseName={exercise.exerciseName}
+        exerciseName={exName}
         onPhotoSaved={(photoUrl) => {
-          updateExerciseMachinePhoto(exercise.exerciseId, photoUrl);
+          if (exercise?.exerciseId) {
+            updateExerciseMachinePhoto(exercise.exerciseId, photoUrl);
+          }
           setIsCameraOpen(false);
         }}
       />
