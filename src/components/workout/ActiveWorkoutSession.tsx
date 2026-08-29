@@ -7,7 +7,13 @@ import { Modal } from '../common/Modal';
 import { formatSecondsToTime } from '../../services/calculations';
 
 export const ActiveWorkoutSession: React.FC = () => {
-  const { activeSession, finishWorkout, cancelWorkout, addExerciseToActiveWorkout } = useWorkout();
+  const { 
+    activeSession, 
+    finishWorkout, 
+    cancelWorkout, 
+    addExerciseToActiveWorkout, 
+    addMultipleExercisesToActiveWorkout 
+  } = useWorkout();
   
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -161,8 +167,13 @@ export const ActiveWorkoutSession: React.FC = () => {
       <ExercisePickerModal
         isOpen={isPickerOpen}
         onClose={() => setIsPickerOpen(false)}
+        multiSelect={true}
+        alreadySelectedIds={safeExercises.map(e => e.exerciseId)}
         onSelectExercise={(exId) => {
           addExerciseToActiveWorkout(exId);
+        }}
+        onSelectMultiple={(exIds) => {
+          addMultipleExercisesToActiveWorkout(exIds);
         }}
       />
 

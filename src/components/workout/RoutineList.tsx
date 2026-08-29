@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Dumbbell, Calendar, History, Clock, Camera, Plus, Edit2, Trash2, ChevronRight } from 'lucide-react';
+import { Play, Dumbbell, Calendar, History, Clock, Camera, Plus, Edit2, Trash2, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Routine, WorkoutSession } from '../../types/workout';
 import { useWorkout } from '../../context/WorkoutContext';
 import { formatSecondsToTime } from '../../services/calculations';
@@ -8,7 +8,7 @@ import { CreateRoutineModal } from './CreateRoutineModal';
 import { WorkoutSessionDetailModal } from './WorkoutSessionDetailModal';
 
 export const RoutineList: React.FC = () => {
-  const { routines, workoutHistory, startWorkout, exercises, deleteRoutine } = useWorkout();
+  const { routines, workoutHistory, startWorkout, exercises, deleteRoutine, moveRoutine } = useWorkout();
   
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isCreateRoutineOpen, setIsCreateRoutineOpen] = useState(false);
@@ -31,6 +31,22 @@ export const RoutineList: React.FC = () => {
   const safeHistory = Array.isArray(workoutHistory) ? workoutHistory : [];
   const safeRoutines = Array.isArray(routines) ? routines : [];
 
+  // Extraer número de día para ordenar inteligentemente del Día 1 al Día 7
+  const getDayNumber = (r: Routine): number => {
+    if (r.dayNumber && r.dayNumber >= 1 && r.dayNumber <= 7) return r.dayNumber;
+    const match = (r.name || '').match(/d[ií]a\s*(\d+)/i);
+    if (match) return parseInt(match[1], 10);
+    return 999;
+  };
+
+  // Ordenar rutinas del Día 1 al Día 7
+  const sortedRoutines = [...safeRoutines].sort((a, b) => {
+    const dayA = getDayNumber(a);
+    const dayB = getDayNumber(b);
+    if (dayA !== dayB) return dayA - dayB;
+    return 0;
+  });
+
   return (
     <div className="space-y-6 pb-24">
       {/* Hero Banner: Iniciar Sesión Rápida */}
@@ -46,7 +62,7 @@ export const RoutineList: React.FC = () => {
             Supera tus marcas de hoy
           </h2>
           <p className="text-xs text-emerald-100/80 mt-1 max-w-xs">
-            Cronometra tus descansos, pre-rellena tus pesos y fotografía tus máquinas.
+            Selección múltiple de máquinas, orden del Día 1 al 7 y fotos en alta resolución.
           </p>
 
           <div className="flex gap-2.5 mt-5">
@@ -70,7 +86,7 @@ export const RoutineList: React.FC = () => {
         </div>
       </div>
 
-      {/* Sección: Tus Rutinas de Entrenamiento */}
+      {/* Sección: Tus Rutinas de Entrenamiento Ordenadas del Día 1 al 7 */}
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <div className="flex items-center gap-2">
@@ -79,7 +95,7 @@ export const RoutineList: React.FC = () => {
               Tus Rutinas
             </h3>
             <span className="text-xs font-mono-numbers px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800">
-              {safeRoutines.length}
+              {sortedRoutines.length}
             </span>
           </div>
 
@@ -95,11 +111,11 @@ export const RoutineList: React.FC = () => {
           </button>
         </div>
 
-        {safeRoutines.length === 0 ? (
+        {sortedRoutines.length === 0 ? (
           <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-center text-slate-400 space-y-2">
             <Dumbbell className="w-8 h-8 text-slate-600 mx-auto" />
             <p className="text-xs font-semibold text-slate-300">No tienes ninguna rutina creada</p>
-            <p className="text-[11px] text-slate-500">Pulsa "+ Nueva Rutina" para diseñar tu primer plan de entrenamiento.</p>
+            <p className="text-[11px] text-slate-500">Pulsa "+ Nueva Rutina" para diseñar tus días de entrenamiento.</p>
             <button
               onClick={() => {
                 setRoutineToEdit(null);
@@ -113,10 +129,11 @@ export const RoutineList: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {safeRoutines.map(routine => {
+            {sortedRoutines.map((routine, index) => {
               if (!routine) return null;
               const routineExercises = routine.exercises || [];
               const muscleGroups = routine.muscleGroups || [];
+              const dayNum = getDayNumber(routine);
 
               return (
                 <div
@@ -125,11 +142,19 @@ export const RoutineList: React.FC = () => {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0 pr-2">
-                      <h4 className="text-base font-bold text-slate-100 group-hover:text-emerald-400 transition truncate">
-                        {routine.name}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        {dayNum <= 7 && (
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-xs font-mono-numbers">
+                            DÍA {dayNum}
+                          </span>
+                        )}
+                        <h4 className="text-base font-bold text-slate-100 group-hover:text-emerald-400 transition truncate">
+                          {routine.name}
+                        </h4>
+                      </div>
+
                       {routine.description && (
-                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-1">
                           {routine.description}
                         </p>
                       )}
@@ -149,8 +174,34 @@ export const RoutineList: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Acciones de Rutina: Editar, Borrar, Iniciar */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Acciones de Rutina: Reordenar, Editar, Borrar, Iniciar */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Botones de subida y bajada de posición */}
+                      <div className="flex flex-col gap-0.5 mr-0.5">
+                        <button
+                          disabled={index === 0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveRoutine(routine.id, 'up');
+                          }}
+                          className="p-1 rounded bg-slate-950 text-slate-500 hover:text-slate-200 disabled:opacity-20 border border-slate-800 transition"
+                          title="Subir posición"
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          disabled={index === sortedRoutines.length - 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveRoutine(routine.id, 'down');
+                          }}
+                          className="p-1 rounded bg-slate-950 text-slate-500 hover:text-slate-200 disabled:opacity-20 border border-slate-800 transition"
+                          title="Bajar posición"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </div>
+
                       <button
                         onClick={(e) => handleEditRoutine(e, routine)}
                         className="p-2 rounded-xl bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800 transition"

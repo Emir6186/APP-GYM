@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Dumbbell, Timer, Check, Eye } from 'lucide-react';
+import { Plus, Trash2, Dumbbell, Timer, Check, Eye, Calendar } from 'lucide-react';
 import type { Routine, RoutineExerciseTemplate, MuscleGroup } from '../../types/workout';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Modal } from '../common/Modal';
@@ -14,15 +14,26 @@ interface CreateRoutineModalProps {
 
 const MUSCLE_GROUPS_LIST: MuscleGroup[] = ['Pecho', 'Espalda', 'Piernas', 'Hombros', 'Brazos', 'Core', 'Cardio'];
 
+const DAYS_LIST = [
+  { num: 1, label: 'Día 1' },
+  { num: 2, label: 'Día 2' },
+  { num: 3, label: 'Día 3' },
+  { num: 4, label: 'Día 4' },
+  { num: 5, label: 'Día 5' },
+  { num: 6, label: 'Día 6' },
+  { num: 7, label: 'Día 7' },
+];
+
 export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
   isOpen,
   onClose,
   routineToEdit
 }) => {
-  const { exercises, createRoutine, updateRoutine } = useWorkout();
+  const { exercises, createRoutine, updateRoutine, routines } = useWorkout();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [dayNumber, setDayNumber] = useState<number | undefined>(undefined);
   const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<MuscleGroup[]>([]);
   const [routineExercises, setRoutineExercises] = useState<RoutineExerciseTemplate[]>([]);
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
@@ -32,15 +43,19 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
     if (routineToEdit) {
       setName(routineToEdit.name || '');
       setDescription(routineToEdit.description || '');
+      setDayNumber(routineToEdit.dayNumber);
       setSelectedMuscleGroups(routineToEdit.muscleGroups || []);
       setRoutineExercises(routineToEdit.exercises || []);
     } else {
-      setName('');
+      // Por defecto sugerir el siguiente número de día disponible
+      const nextDay = Math.min(7, (routines?.length || 0) + 1);
+      setName(`Día ${nextDay}: `);
       setDescription('');
+      setDayNumber(nextDay);
       setSelectedMuscleGroups(['Pecho']);
       setRoutineExercises([]);
     }
-  }, [routineToEdit, isOpen]);
+  }, [routineToEdit, isOpen, routines?.length]);
 
   const toggleMuscleGroup = (mg: MuscleGroup) => {
     setSelectedMuscleGroups(prev =>
@@ -101,6 +116,7 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
         ...routineToEdit,
         name: name.trim(),
         description: description.trim(),
+        dayNumber,
         muscleGroups: selectedMuscleGroups.length > 0 ? selectedMuscleGroups : ['Pecho'],
         exercises: routineExercises
       });
@@ -108,6 +124,8 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
       createRoutine({
         name: name.trim(),
         description: description.trim(),
+        dayNumber,
+        orderIndex: dayNumber || (routines.length + 1),
         muscleGroups: selectedMuscleGroups.length > 0 ? selectedMuscleGroups : ['Pecho'],
         exercises: routineExercises
       });
@@ -126,6 +144,39 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
         maxWidth="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Selector de Día (Día 1 al Día 7) */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              Asignar Día del Plan (1 al 7)
+            </label>
+            <div className="grid grid-cols-7 gap-1">
+              {DAYS_LIST.map(d => {
+                const isSelected = dayNumber === d.num;
+                return (
+                  <button
+                    key={d.num}
+                    type="button"
+                    onClick={() => {
+                      setDayNumber(d.num);
+                      if (name.startsWith('Día ') || name === '') {
+                        const baseTitle = name.replace(/^Día\s*\d+\s*:\s*/i, '').replace(/^Día\s*\d+/i, '').trim();
+                        setName(`Día ${d.num}${baseTitle ? `: ${baseTitle}` : ': '}`);
+                      }
+                    }}
+                    className={`py-2 rounded-xl text-xs font-bold font-mono-numbers border transition ${
+                      isSelected
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-900 hover:text-slate-200'
+                    }`}
+                  >
+                    D{d.num}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Nombre de la Rutina */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -134,7 +185,7 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
             <input
               type="text"
               required
-              placeholder="Ej: Torso / Pierna A, Push Day, Brazos y Hombros..."
+              placeholder="Ej: Día 1: Pecho y Tríceps, Día 2: Espalda y Bíceps..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"

@@ -26,6 +26,7 @@ interface WorkoutContextType {
   repeatWorkoutSession: (session: WorkoutSession) => void;
   deleteWorkoutSession: (sessionId: string) => void;
   addExerciseToActiveWorkout: (exerciseId: string) => void;
+  addMultipleExercisesToActiveWorkout: (exerciseIds: string[]) => void;
   removeExerciseFromActiveWorkout: (exerciseIndex: number) => void;
   addSet: (exerciseIndex: number) => void;
   removeSet: (exerciseIndex: number, setIndex: number) => void;
@@ -48,10 +49,11 @@ interface WorkoutContextType {
   updateExercise: (updatedEx: Exercise) => void;
   deleteExercise: (exerciseId: string) => void;
 
-  // Gestión de Rutinas (CRUD Completo)
+  // Gestión de Rutinas (CRUD Completo y Ordenación)
   createRoutine: (routine: Omit<Routine, 'id'>) => Routine;
   updateRoutine: (routine: Routine) => void;
   deleteRoutine: (id: string) => void;
+  moveRoutine: (id: string, direction: 'up' | 'down') => void;
 }
 
 const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
@@ -205,7 +207,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (routine) {
       initialExercises = (routine.exercises || []).map(tmpl => {
         const exMeta = exercises.find(e => e.id === tmpl.exerciseId);
-        const lastPerf = getLastExercisePerformance(tmpl.exerciseId);
+        const lastPerf = tmpl.exerciseId ? getLastExercisePerformance(tmpl.exerciseId) : null;
 
         const defaultWeight = lastPerf ? lastPerf.lastWeightKg : (tmpl.defaultWeightKg || 0);
         const defaultReps = lastPerf ? lastPerf.lastReps : (tmpl.defaultReps || 10);
@@ -221,8 +223,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }));
 
         return {
-          exerciseId: tmpl.exerciseId,
-          exerciseName: exMeta ? exMeta.name : 'Ejercicio',
+          exerciseId: tmpl.exerciseId || `ex_${Date.now()}`,
+          exerciseName: exMeta ? exMeta.name : (tmpl.exerciseId || 'Ejercicio'),
           exerciseCategory: exMeta ? exMeta.category : 'Pecho',
           exercisePhotoUrl: exMeta ? exMeta.machinePhotoUrl : undefined,
           targetRestSeconds: tmpl.targetRestSeconds || exMeta?.defaultRestSeconds || 60,
@@ -337,7 +339,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       totalSetsCompleted: completedSetsCount
     };
 
-    // Actualizar estado e inmediatamente limpiar localStorage de la sesión activa
     setWorkoutHistory(prev => {
       const updated = [completedSession, ...prev];
       storageService.saveWorkoutHistory(updated);
@@ -365,7 +366,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     skipRestTimer();
   }, [skipRestTimer]);
 
-  // Añadir ejercicio a sesión activa con memoria del último peso/reps
+  // Añadir un ejercicio a la sesión activa
   const addExerciseToActiveWorkout = useCallback((exerciseId: string) => {
     if (!activeSession) return;
     const exMeta = exercises.find(e => e.id === exerciseId);
@@ -399,6 +400,50 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const updated = {
         ...prev,
         exercises: [...(prev.exercises || []), newExercise]
+      };
+      storageService.saveActiveSession(updated);
+      return updated;
+    });
+  }, [activeSession, exercises, getLastExercisePerformance]);
+
+  // Añadir múltiples ejercicios a la vez a la sesión activa
+  const addMultipleExercisesToActiveWorkout = useCallback((exerciseIds: string[]) => {
+    if (!activeSession) return;
+    const newExercises: WorkoutExercise[] = [];
+
+    exerciseIds.forEach(id => {
+      const exMeta = exercises.find(e => e.id === id);
+      if (!exMeta) return;
+
+      const lastPerf = getLastExercisePerformance(id);
+      const initialWeight = lastPerf ? lastPerf.lastWeightKg : 20;
+      const initialReps = lastPerf ? lastPerf.lastReps : 10;
+      const initialSetsCount = lastPerf ? lastPerf.lastSetsCount : 4;
+
+      const sets: WorkoutSet[] = Array.from({ length: initialSetsCount }).map((_, idx) => ({
+        id: `set_${Date.now()}_${idx + 1}`,
+        setNumber: idx + 1,
+        weightKg: initialWeight,
+        reps: initialReps,
+        durationSeconds: 0,
+        isCompleted: false
+      }));
+
+      newExercises.push({
+        exerciseId: exMeta.id,
+        exerciseName: exMeta.name,
+        exerciseCategory: exMeta.category,
+        exercisePhotoUrl: exMeta.machinePhotoUrl,
+        targetRestSeconds: exMeta.defaultRestSeconds || 60,
+        sets
+      });
+    });
+
+    setActiveSession(prev => {
+      if (!prev) return null;
+      const updated = {
+        ...prev,
+        exercises: [...(prev.exercises || []), ...newExercises]
       };
       storageService.saveActiveSession(updated);
       return updated;
@@ -603,6 +648,20 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setRoutines(prev => prev.filter(r => r.id !== id));
   }, []);
 
+  const moveRoutine = useCallback((id: string, direction: 'up' | 'down') => {
+    setRoutines(prev => {
+      const index = prev.findIndex(r => r.id === id);
+      if (index < 0) return prev;
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+
+      const updated = [...prev];
+      const [moved] = updated.splice(index, 1);
+      updated.splice(targetIndex, 0, moved);
+      return updated;
+    });
+  }, []);
+
   return (
     <WorkoutContext.Provider value={{
       exercises,
@@ -616,6 +675,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       repeatWorkoutSession,
       deleteWorkoutSession,
       addExerciseToActiveWorkout,
+      addMultipleExercisesToActiveWorkout,
       removeExerciseFromActiveWorkout,
       addSet,
       removeSet,
@@ -635,7 +695,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deleteExercise,
       createRoutine,
       updateRoutine,
-      deleteRoutine
+      deleteRoutine,
+      moveRoutine
     }}>
       {children}
     </WorkoutContext.Provider>

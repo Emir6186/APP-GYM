@@ -58,6 +58,8 @@ export interface Routine {
   description: string;
   muscleGroups: MuscleGroup[];
   exercises: RoutineExerciseTemplate[];
+  dayNumber?: number; // 1 a 7 (Día 1 a Día 7)
+  orderIndex?: number;
   icon?: string;
 }
 
