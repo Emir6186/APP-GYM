@@ -6,6 +6,7 @@ import { formatSecondsToTime } from '../../services/calculations';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { WorkoutSessionDetailModal } from './WorkoutSessionDetailModal';
+import { sortRoutinesByDay, extractRoutineDayNumber } from '../../services/routineSorter';
 
 export const RoutineList: React.FC = () => {
   const { routines, workoutHistory, startWorkout, exercises, deleteRoutine, moveRoutine } = useWorkout();
@@ -31,21 +32,8 @@ export const RoutineList: React.FC = () => {
   const safeHistory = Array.isArray(workoutHistory) ? workoutHistory : [];
   const safeRoutines = Array.isArray(routines) ? routines : [];
 
-  // Extraer número de día para ordenar inteligentemente del Día 1 al Día 7
-  const getDayNumber = (r: Routine): number => {
-    if (r.dayNumber && r.dayNumber >= 1 && r.dayNumber <= 7) return r.dayNumber;
-    const match = (r.name || '').match(/d[ií]a\s*(\d+)/i);
-    if (match) return parseInt(match[1], 10);
-    return 999;
-  };
-
-  // Ordenar rutinas del Día 1 al Día 7
-  const sortedRoutines = [...safeRoutines].sort((a, b) => {
-    const dayA = getDayNumber(a);
-    const dayB = getDayNumber(b);
-    if (dayA !== dayB) return dayA - dayB;
-    return 0;
-  });
+  // Rutinas ordenadas estrictamente del Día 1 al Día 7
+  const sortedRoutines = sortRoutinesByDay(safeRoutines);
 
   return (
     <div className="space-y-6 pb-24">
@@ -62,7 +50,7 @@ export const RoutineList: React.FC = () => {
             Supera tus marcas de hoy
           </h2>
           <p className="text-xs text-emerald-100/80 mt-1 max-w-xs">
-            Selección múltiple de máquinas, orden del Día 1 al 7 y fotos en alta resolución.
+            Rutinas ordenadas del Día 1 al 7, selección múltiple y fotos en alta resolución.
           </p>
 
           <div className="flex gap-2.5 mt-5">
@@ -133,7 +121,7 @@ export const RoutineList: React.FC = () => {
               if (!routine) return null;
               const routineExercises = routine.exercises || [];
               const muscleGroups = routine.muscleGroups || [];
-              const dayNum = getDayNumber(routine);
+              const dayNum = extractRoutineDayNumber(routine);
 
               return (
                 <div

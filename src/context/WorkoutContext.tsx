@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Exercise, Routine, WorkoutSession, WorkoutExercise, WorkoutSet, RestTimerState } from '../types/workout';
 import { storageService } from '../services/storage';
 import { playCountdownTick, playRestCompleteSound, playSetCompleteSound } from '../services/audioService';
+import { sortRoutinesByDay } from '../services/routineSorter';
 import confetti from 'canvas-confetti';
 
 interface LastExerciseHistory {
@@ -636,16 +637,28 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...routine,
       id: `routine_${Date.now()}`
     };
-    setRoutines(prev => [...prev, newRoutine]);
+    setRoutines(prev => {
+      const updated = sortRoutinesByDay([...prev, newRoutine]);
+      storageService.saveRoutines(updated);
+      return updated;
+    });
     return newRoutine;
   }, []);
 
   const updateRoutine = useCallback((updatedRoutine: Routine) => {
-    setRoutines(prev => prev.map(r => r.id === updatedRoutine.id ? updatedRoutine : r));
+    setRoutines(prev => {
+      const updated = sortRoutinesByDay(prev.map(r => r.id === updatedRoutine.id ? updatedRoutine : r));
+      storageService.saveRoutines(updated);
+      return updated;
+    });
   }, []);
 
   const deleteRoutine = useCallback((id: string) => {
-    setRoutines(prev => prev.filter(r => r.id !== id));
+    setRoutines(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      storageService.saveRoutines(updated);
+      return updated;
+    });
   }, []);
 
   const moveRoutine = useCallback((id: string, direction: 'up' | 'down') => {
@@ -658,7 +671,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const updated = [...prev];
       const [moved] = updated.splice(index, 1);
       updated.splice(targetIndex, 0, moved);
-      return updated;
+
+      // Re-indexar orderIndex explícitamente para persistir el orden manual
+      const reindexed = updated.map((r, idx) => ({
+        ...r,
+        orderIndex: idx + 1
+      }));
+
+      storageService.saveRoutines(reindexed);
+      return reindexed;
     });
   }, []);
 

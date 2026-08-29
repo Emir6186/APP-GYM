@@ -5,6 +5,7 @@ import { DEFAULT_EXERCISES } from '../data/defaultExercises';
 import { calculateAllMetrics } from './calculations';
 import { generateWeeklyDietPlan } from './mealPlanGenerator';
 import { generateShoppingListFromPlan } from './shoppingListGenerator';
+import { sortRoutinesByDay } from './routineSorter';
 
 const STORAGE_KEYS = {
   EXERCISES: 'fittrack_exercises_v1',
@@ -140,7 +141,7 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEYS.EXERCISES, JSON.stringify(exercises));
   },
 
-  // Rutinas sanitizadas
+  // Rutinas sanitizadas y ordenadas por día (1 a 7)
   getRoutines(): Routine[] {
     const raw = localStorage.getItem(STORAGE_KEYS.ROUTINES);
     if (!raw) {
@@ -150,10 +151,12 @@ export const storageService = {
     try {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return DEFAULT_ROUTINES;
-      return parsed.map(r => ({
+      const sanitized = parsed.map(r => ({
         ...r,
         id: r?.id || `routine_${Date.now()}`,
         name: r?.name || 'Rutina',
+        dayNumber: r?.dayNumber,
+        orderIndex: r?.orderIndex,
         muscleGroups: Array.isArray(r?.muscleGroups) ? r.muscleGroups : ['Pecho'],
         exercises: Array.isArray(r?.exercises) ? r.exercises.map((e: any) => ({
           exerciseId: e?.exerciseId || `ex_${Date.now()}`,
@@ -163,6 +166,7 @@ export const storageService = {
           targetRestSeconds: e?.targetRestSeconds || 60
         })) : []
       }));
+      return sortRoutinesByDay(sanitized);
     } catch {
       return DEFAULT_ROUTINES;
     }
