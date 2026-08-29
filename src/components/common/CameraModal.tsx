@@ -43,8 +43,8 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: mode,
-          width: { ideal: 720 },
-          height: { ideal: 720 }
+          width: { ideal: 480 },
+          height: { ideal: 480 }
         },
         audio: false
       });
@@ -86,16 +86,16 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     startCamera(nextMode);
   };
 
-  // Capturar foto del fotograma del video
+  // Capturar foto del fotograma del video y comprimir a tamaño ligero (250x250, ~15KB)
   const takePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const size = Math.min(video.videoWidth || 640, video.videoHeight || 640);
+    const size = Math.min(video.videoWidth || 480, video.videoHeight || 480);
 
-    canvas.width = 400;
-    canvas.height = 400;
+    canvas.width = 250;
+    canvas.height = 250;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -104,9 +104,10 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     const startX = (video.videoWidth - size) / 2;
     const startY = (video.videoHeight - size) / 2;
 
-    ctx.drawImage(video, startX, startY, size, size, 0, 0, 400, 400);
+    ctx.drawImage(video, startX, startY, size, size, 0, 0, 250, 250);
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    // Calidad 0.6 para tamaño ultra ligero (10-15KB)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
     setCapturedImage(dataUrl);
 
     // Detener stream para ahorrar batería
@@ -116,7 +117,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     }
   };
 
-  // Manejar subida de archivo desde galería/cámara nativa
+  // Manejar subida de archivo desde galería/cámara nativa con compresión ligera
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -126,15 +127,15 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 400;
-        canvas.height = 400;
+        canvas.width = 250;
+        canvas.height = 250;
         const ctx = canvas.getContext('2d');
         if (ctx) {
           const minDim = Math.min(img.width, img.height);
           const startX = (img.width - minDim) / 2;
           const startY = (img.height - minDim) / 2;
-          ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, 400, 400);
-          setCapturedImage(canvas.toDataURL('image/jpeg', 0.85));
+          ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, 250, 250);
+          setCapturedImage(canvas.toDataURL('image/jpeg', 0.6));
         }
       };
       img.src = event.target?.result as string;

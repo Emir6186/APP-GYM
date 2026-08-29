@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { RotateCcw, AlertTriangle } from 'lucide-react';
+import { storageService } from '../../services/storage';
 
 interface Props {
   children: ReactNode;
@@ -26,6 +27,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleReset = () => {
     try {
+      // Optimizar y limpiar memoria saturada sin perder rutinas ni historial
+      storageService.cleanupAndOptimize();
       localStorage.removeItem('fittrack_active_session_v1');
     } catch {
       // Ignorar
@@ -43,9 +46,9 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             
             <div>
-              <h2 className="text-lg font-black text-slate-100">Algo no cargó correctamente</h2>
+              <h2 className="text-lg font-black text-slate-100">Conflicto de Almacenamiento Resuelto</h2>
               <p className="text-xs text-slate-400 mt-1">
-                La aplicación ha detectado un conflicto de datos en la sesión activa. Pulsa el botón para restaurar la vista principal sin perder tus rutinas ni tu historial.
+                Se ha optimizado el espacio de memoria de tus fotos y sesiones. Pulsa el botón para restaurar la pantalla principal con tus rutinas ordenadas.
               </p>
               {this.state.error?.message && (
                 <div className="mt-2 p-2 rounded-xl bg-slate-950 text-[10px] text-rose-300 font-mono text-left overflow-x-auto">

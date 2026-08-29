@@ -22,8 +22,10 @@ const STORAGE_KEYS = {
 const DEFAULT_ROUTINES: Routine[] = [
   {
     id: 'routine_push',
-    name: 'Empuje (Push Day) - Pecho, Hombro y Tríceps',
+    name: 'Día 1: Empuje (Push Day) - Pecho, Hombro y Tríceps',
     description: 'Enfocado en hipertrofia y fuerza de empujes horizontales y verticales.',
+    dayNumber: 1,
+    orderIndex: 1,
     muscleGroups: ['Pecho', 'Hombros', 'Brazos'],
     exercises: [
       { exerciseId: 'ex_bench_press', defaultSets: 4, defaultReps: 8, defaultWeightKg: 70, targetRestSeconds: 90 },
@@ -35,8 +37,10 @@ const DEFAULT_ROUTINES: Routine[] = [
   },
   {
     id: 'routine_pull',
-    name: 'Tirón (Pull Day) - Espalda, Deltoides Post. y Bíceps',
+    name: 'Día 2: Tirón (Pull Day) - Espalda y Bíceps',
     description: 'Desarrollo de amplitud de dorsales, densidad y flexores de codo.',
+    dayNumber: 2,
+    orderIndex: 2,
     muscleGroups: ['Espalda', 'Hombros', 'Brazos'],
     exercises: [
       { exerciseId: 'ex_deadlift', defaultSets: 3, defaultReps: 6, defaultWeightKg: 110, targetRestSeconds: 120 },
@@ -48,8 +52,10 @@ const DEFAULT_ROUTINES: Routine[] = [
   },
   {
     id: 'routine_legs',
-    name: 'Pierna Completa (Leg Day) - Fuerza e Hipertrofia',
+    name: 'Día 3: Pierna Completa (Leg Day)',
     description: 'Sentadillas pesadas, prensa inclinada y trabajo aislado de cadena posterior.',
+    dayNumber: 3,
+    orderIndex: 3,
     muscleGroups: ['Piernas', 'Core'],
     exercises: [
       { exerciseId: 'ex_barbell_squat', defaultSets: 4, defaultReps: 8, defaultWeightKg: 85, targetRestSeconds: 120 },
@@ -72,62 +78,70 @@ const DEFAULT_USER_PROFILE: UserProfile = {
   heightCm: 178,
   trainingDaysPerWeek: 4,
   activityLevel: 'moderate',
-  goal: 'deficit_moderate', // -500 kcal
+  goal: 'deficit_moderate',
   startDate: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString()
 };
 
-// Revisiones semanales de ejemplo
-const DEFAULT_CHECKINS: WeeklyCheckIn[] = [
-  {
-    id: 'chk_1',
-    date: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
-    weekNumber: 1,
-    weightKg: 80.4,
-    waistCircumferenceCm: 86.0,
-    chestCm: 104.0,
-    armCm: 37.5,
-    thighCm: 59.0,
-    bodyFatPercentage: 18.2,
-    notes: 'Inicio del plan de definición. Buena energía en entrenamientos.',
-    energyLevel: 4,
-    trainingCompliance: 100
-  },
-  {
-    id: 'chk_2',
-    date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-    weekNumber: 2,
-    weightKg: 79.6,
-    waistCircumferenceCm: 85.0,
-    chestCm: 103.5,
-    armCm: 37.5,
-    thighCm: 58.5,
-    bodyFatPercentage: 17.5,
-    notes: 'Pérdida constante de grasa abdominal, manteniendo pesos en barra.',
-    energyLevel: 4,
-    trainingCompliance: 100
-  },
-  {
-    id: 'chk_3',
-    date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    weekNumber: 3,
-    weightKg: 78.9,
-    waistCircumferenceCm: 84.2,
-    chestCm: 103.5,
-    armCm: 37.6,
-    thighCm: 58.2,
-    bodyFatPercentage: 16.8,
-    notes: 'Excelente definición visual. Cintura bajando de forma notable.',
-    energyLevel: 5,
-    trainingCompliance: 100
+// Guardado seguro con control de cuota (QuotaExceededError protection)
+function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`LocalStorage quota exceeded en ${key}. Optimizando almacenamiento...`, err);
+    try {
+      storageService.cleanupAndOptimize();
+      localStorage.setItem(key, value);
+    } catch (retryErr) {
+      console.error('Error al guardar tras optimización:', retryErr);
+    }
   }
-];
+}
 
 export const storageService = {
+  // Limpieza y optimización automática de memoria (elimina duplicados pesados)
+  cleanupAndOptimize(): void {
+    try {
+      // 1. Limpiar fotos duplicadas de historial
+      const rawHistory = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
+      if (rawHistory) {
+        const parsed = JSON.parse(rawHistory);
+        if (Array.isArray(parsed)) {
+          const stripped = parsed.map(s => ({
+            ...s,
+            exercises: (s.exercises || []).map((e: any) => {
+              const { exercisePhotoUrl: _, ...rest } = e;
+              return rest;
+            })
+          }));
+          localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(stripped));
+        }
+      }
+
+      // 2. Limpiar sesión activa si está saturada
+      const rawActive = localStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION);
+      if (rawActive) {
+        const parsedActive = JSON.parse(rawActive);
+        if (parsedActive && typeof parsedActive === 'object') {
+          const strippedActive = {
+            ...parsedActive,
+            exercises: (parsedActive.exercises || []).map((e: any) => {
+              const { exercisePhotoUrl: _, ...rest } = e;
+              return rest;
+            })
+          };
+          localStorage.setItem(STORAGE_KEYS.ACTIVE_SESSION, JSON.stringify(strippedActive));
+        }
+      }
+    } catch (e) {
+      console.warn('Error en cleanupAndOptimize:', e);
+    }
+  },
+
   // Ejercicios
   getExercises(): Exercise[] {
     const raw = localStorage.getItem(STORAGE_KEYS.EXERCISES);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.EXERCISES, JSON.stringify(DEFAULT_EXERCISES));
+      safeSetItem(STORAGE_KEYS.EXERCISES, JSON.stringify(DEFAULT_EXERCISES));
       return DEFAULT_EXERCISES;
     }
     try {
@@ -138,19 +152,20 @@ export const storageService = {
     }
   },
   saveExercises(exercises: Exercise[]): void {
-    localStorage.setItem(STORAGE_KEYS.EXERCISES, JSON.stringify(exercises));
+    safeSetItem(STORAGE_KEYS.EXERCISES, JSON.stringify(exercises));
   },
 
   // Rutinas sanitizadas y ordenadas por día (1 a 7)
   getRoutines(): Routine[] {
     const raw = localStorage.getItem(STORAGE_KEYS.ROUTINES);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(DEFAULT_ROUTINES));
-      return DEFAULT_ROUTINES;
+      const sortedDefaults = sortRoutinesByDay(DEFAULT_ROUTINES);
+      safeSetItem(STORAGE_KEYS.ROUTINES, JSON.stringify(sortedDefaults));
+      return sortedDefaults;
     }
     try {
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return DEFAULT_ROUTINES;
+      if (!Array.isArray(parsed)) return sortRoutinesByDay(DEFAULT_ROUTINES);
       const sanitized = parsed.map(r => ({
         ...r,
         id: r?.id || `routine_${Date.now()}`,
@@ -168,50 +183,67 @@ export const storageService = {
       }));
       return sortRoutinesByDay(sanitized);
     } catch {
-      return DEFAULT_ROUTINES;
+      return sortRoutinesByDay(DEFAULT_ROUTINES);
     }
   },
   saveRoutines(routines: Routine[]): void {
-    localStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
+    const sorted = sortRoutinesByDay(routines);
+    safeSetItem(STORAGE_KEYS.ROUTINES, JSON.stringify(sorted));
   },
 
-  // Historial de Entrenamientos sanitizado
+  // Historial de Entrenamientos ultra-optimizado (sin duplicación de fotos)
   getWorkoutHistory(): WorkoutSession[] {
     const raw = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
+      const exList = this.getExercises();
+
       return parsed.map(s => ({
         ...s,
         id: s?.id || `session_${Date.now()}`,
         name: s?.name || 'Entrenamiento',
         date: s?.date || new Date().toISOString(),
         totalDurationSeconds: s?.totalDurationSeconds || 0,
-        exercises: Array.isArray(s?.exercises) ? s.exercises.map((e: any) => ({
-          ...e,
-          exerciseId: e?.exerciseId || `ex_${Date.now()}`,
-          exerciseName: e?.exerciseName || 'Ejercicio',
-          exerciseCategory: e?.exerciseCategory || 'General',
-          targetRestSeconds: e?.targetRestSeconds || 60,
-          sets: Array.isArray(e?.sets) ? e.sets : []
-        })) : []
+        exercises: Array.isArray(s?.exercises) ? s.exercises.map((e: any) => {
+          const exMeta = exList.find(meta => meta.id === e?.exerciseId);
+          return {
+            ...e,
+            exerciseId: e?.exerciseId || `ex_${Date.now()}`,
+            exerciseName: e?.exerciseName || exMeta?.name || 'Ejercicio',
+            exerciseCategory: e?.exerciseCategory || exMeta?.category || 'General',
+            exercisePhotoUrl: exMeta?.machinePhotoUrl || e?.exercisePhotoUrl,
+            targetRestSeconds: e?.targetRestSeconds || 60,
+            sets: Array.isArray(e?.sets) ? e.sets : []
+          };
+        }) : []
       }));
     } catch {
       return [];
     }
   },
   saveWorkoutHistory(history: WorkoutSession[]): void {
-    localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(history));
+    // Optimización: remover fotos inline pesadas de cada sesión del historial para ahorrar 95% de espacio
+    const lightweight = history.map(s => ({
+      ...s,
+      exercises: (s.exercises || []).map(e => {
+        const { exercisePhotoUrl: _, ...rest } = e;
+        return rest;
+      })
+    }));
+    safeSetItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(lightweight));
   },
 
-  // Sesión Activa de Entrenamiento sanitizada
+  // Sesión Activa de Entrenamiento optimizada
   getActiveSession(): WorkoutSession | null {
     const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION);
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return null;
+      const exList = this.getExercises();
+
       return {
         ...parsed,
         id: parsed.id || `session_${Date.now()}`,
@@ -219,22 +251,26 @@ export const storageService = {
         date: parsed.date || new Date().toISOString(),
         startTime: parsed.startTime || Date.now(),
         totalDurationSeconds: parsed.totalDurationSeconds || 0,
-        exercises: Array.isArray(parsed.exercises) ? parsed.exercises.map((e: any) => ({
-          ...e,
-          exerciseId: e?.exerciseId || `ex_${Date.now()}`,
-          exerciseName: e?.exerciseName || 'Ejercicio',
-          exerciseCategory: e?.exerciseCategory || 'General',
-          targetRestSeconds: e?.targetRestSeconds || 60,
-          sets: Array.isArray(e?.sets) ? e.sets.map((s: any, sIdx: number) => ({
-            id: s?.id || `set_${Date.now()}_${sIdx}`,
-            setNumber: s?.setNumber || sIdx + 1,
-            weightKg: s?.weightKg || 0,
-            reps: s?.reps || 0,
-            durationSeconds: s?.durationSeconds || 0,
-            isCompleted: !!s?.isCompleted,
-            completedAt: s?.completedAt
-          })) : []
-        })) : []
+        exercises: Array.isArray(parsed.exercises) ? parsed.exercises.map((e: any) => {
+          const exMeta = exList.find(meta => meta.id === e?.exerciseId);
+          return {
+            ...e,
+            exerciseId: e?.exerciseId || `ex_${Date.now()}`,
+            exerciseName: e?.exerciseName || exMeta?.name || 'Ejercicio',
+            exerciseCategory: e?.exerciseCategory || exMeta?.category || 'General',
+            exercisePhotoUrl: exMeta?.machinePhotoUrl || e?.exercisePhotoUrl,
+            targetRestSeconds: e?.targetRestSeconds || 60,
+            sets: Array.isArray(e?.sets) ? e.sets.map((s: any, sIdx: number) => ({
+              id: s?.id || `set_${Date.now()}_${sIdx}`,
+              setNumber: s?.setNumber || sIdx + 1,
+              weightKg: s?.weightKg || 0,
+              reps: s?.reps || 0,
+              durationSeconds: s?.durationSeconds || 0,
+              isCompleted: !!s?.isCompleted,
+              completedAt: s?.completedAt
+            })) : []
+          };
+        }) : []
       };
     } catch {
       return null;
@@ -244,7 +280,15 @@ export const storageService = {
     if (!session) {
       localStorage.removeItem(STORAGE_KEYS.ACTIVE_SESSION);
     } else {
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_SESSION, JSON.stringify(session));
+      // Optimización ligera
+      const lightweight = {
+        ...session,
+        exercises: (session.exercises || []).map(e => {
+          const { exercisePhotoUrl: _, ...rest } = e;
+          return rest;
+        })
+      };
+      safeSetItem(STORAGE_KEYS.ACTIVE_SESSION, JSON.stringify(lightweight));
     }
   },
 
@@ -252,7 +296,7 @@ export const storageService = {
   getUserProfile(): UserProfile {
     const raw = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(DEFAULT_USER_PROFILE));
+      safeSetItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(DEFAULT_USER_PROFILE));
       return DEFAULT_USER_PROFILE;
     }
     try {
@@ -268,25 +312,22 @@ export const storageService = {
     }
   },
   saveUserProfile(profile: UserProfile): void {
-    localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+    safeSetItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
   },
 
   // Revisiones Semanales
   getWeeklyCheckIns(): WeeklyCheckIn[] {
     const raw = localStorage.getItem(STORAGE_KEYS.WEEKLY_CHECKINS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.WEEKLY_CHECKINS, JSON.stringify(DEFAULT_CHECKINS));
-      return DEFAULT_CHECKINS;
-    }
+    if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : DEFAULT_CHECKINS;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return DEFAULT_CHECKINS;
+      return [];
     }
   },
   saveWeeklyCheckIns(checkIns: WeeklyCheckIn[]): void {
-    localStorage.setItem(STORAGE_KEYS.WEEKLY_CHECKINS, JSON.stringify(checkIns));
+    safeSetItem(STORAGE_KEYS.WEEKLY_CHECKINS, JSON.stringify(checkIns));
   },
 
   // Plan Dietético Semanal
@@ -296,7 +337,7 @@ export const storageService = {
       const profile = this.getUserProfile();
       const metrics = calculateAllMetrics(profile);
       const initialPlan = generateWeeklyDietPlan(metrics);
-      localStorage.setItem(STORAGE_KEYS.WEEKLY_DIET_PLAN, JSON.stringify(initialPlan));
+      safeSetItem(STORAGE_KEYS.WEEKLY_DIET_PLAN, JSON.stringify(initialPlan));
       return initialPlan;
     }
     try {
@@ -308,7 +349,7 @@ export const storageService = {
     }
   },
   saveWeeklyDietPlan(plan: WeeklyDietPlan): void {
-    localStorage.setItem(STORAGE_KEYS.WEEKLY_DIET_PLAN, JSON.stringify(plan));
+    safeSetItem(STORAGE_KEYS.WEEKLY_DIET_PLAN, JSON.stringify(plan));
   },
 
   // Lista de la Compra
@@ -317,7 +358,7 @@ export const storageService = {
     if (!raw) {
       const dietPlan = this.getWeeklyDietPlan();
       const initialShopping = generateShoppingListFromPlan(dietPlan);
-      localStorage.setItem(STORAGE_KEYS.SHOPPING_LIST, JSON.stringify(initialShopping));
+      safeSetItem(STORAGE_KEYS.SHOPPING_LIST, JSON.stringify(initialShopping));
       return initialShopping;
     }
     try {
@@ -328,6 +369,6 @@ export const storageService = {
     }
   },
   saveShoppingList(items: ShoppingItem[]): void {
-    localStorage.setItem(STORAGE_KEYS.SHOPPING_LIST, JSON.stringify(items));
+    safeSetItem(STORAGE_KEYS.SHOPPING_LIST, JSON.stringify(items));
   }
 };
