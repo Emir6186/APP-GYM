@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Dumbbell, Timer, Check } from 'lucide-react';
+import { Plus, Trash2, Dumbbell, Timer, Check, Eye } from 'lucide-react';
 import type { Routine, RoutineExerciseTemplate, MuscleGroup } from '../../types/workout';
 import { useWorkout } from '../../context/WorkoutContext';
 import { Modal } from '../common/Modal';
 import { ExercisePickerModal } from './ExercisePickerModal';
+import { ImageZoomModal } from '../common/ImageZoomModal';
 
 interface CreateRoutineModalProps {
   isOpen: boolean;
@@ -25,10 +26,11 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
   const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<MuscleGroup[]>([]);
   const [routineExercises, setRoutineExercises] = useState<RoutineExerciseTemplate[]>([]);
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
+  const [zoomImage, setZoomImage] = useState<{ url?: string; title: string; subtitle?: string } | null>(null);
 
   useEffect(() => {
     if (routineToEdit) {
-      setName(routineToEdit.name);
+      setName(routineToEdit.name || '');
       setDescription(routineToEdit.description || '');
       setSelectedMuscleGroups(routineToEdit.muscleGroups || []);
       setRoutineExercises(routineToEdit.exercises || []);
@@ -46,27 +48,33 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
     );
   };
 
-  const handleAddExercise = (exerciseId: string) => {
-    const exMeta = exercises.find(e => e.id === exerciseId);
-    if (!exMeta) return;
+  // Añadir múltiples ejercicios simultáneamente
+  const handleAddMultipleExercises = (exerciseIds: string[]) => {
+    const newTemplates: RoutineExerciseTemplate[] = [];
+    const newGroups = new Set<MuscleGroup>(selectedMuscleGroups);
 
-    // Si ya está, no duplicarlo
-    if (routineExercises.some(re => re.exerciseId === exerciseId)) return;
+    exerciseIds.forEach(id => {
+      // Si ya está en la rutina, no duplicarlo
+      if (routineExercises.some(re => re.exerciseId === id)) return;
 
-    const newTemplate: RoutineExerciseTemplate = {
-      exerciseId: exMeta.id,
-      defaultSets: 4,
-      defaultReps: 10,
-      defaultWeightKg: 20,
-      targetRestSeconds: exMeta.defaultRestSeconds || 60
-    };
+      const exMeta = exercises.find(e => e.id === id);
+      if (exMeta) {
+        newTemplates.push({
+          exerciseId: exMeta.id,
+          defaultSets: 4,
+          defaultReps: 10,
+          defaultWeightKg: 20,
+          targetRestSeconds: exMeta.defaultRestSeconds || 60
+        });
 
-    setRoutineExercises(prev => [...prev, newTemplate]);
+        if (exMeta.category) {
+          newGroups.add(exMeta.category);
+        }
+      }
+    });
 
-    // Añadir grupo muscular si no está
-    if (!selectedMuscleGroups.includes(exMeta.category)) {
-      setSelectedMuscleGroups(prev => [...prev, exMeta.category]);
-    }
+    setRoutineExercises(prev => [...prev, ...newTemplates]);
+    setSelectedMuscleGroups(Array.from(newGroups));
   };
 
   const handleRemoveExercise = (idx: number) => {
@@ -114,7 +122,7 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
         isOpen={isOpen}
         onClose={onClose}
         title={routineToEdit ? "Editar Rutina" : "Crear Nueva Rutina"}
-        subtitle={routineToEdit ? "Modifica los ejercicios y series de tu rutina" : "Diseña tu rutina personalizada con máquinas y ejercicios"}
+        subtitle={routineToEdit ? "Modifica los ejercicios y series de tu rutina" : "Diseña tu rutina seleccionando tus máquinas y ejercicios"}
         maxWidth="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -184,17 +192,21 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsExercisePickerOpen(true)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold border border-emerald-500/40 transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold border border-emerald-500/40 transition active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                Añadir Ejercicio
+                Seleccionar Ejercicios
               </button>
             </div>
 
             {routineExercises.length === 0 ? (
-              <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-center text-slate-400">
-                <p className="text-xs">No has añadido ejercicios a esta rutina todavía.</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Pulsa "+ Añadir Ejercicio" para seleccionar del catálogo de máquinas.</p>
+              <div 
+                onClick={() => setIsExercisePickerOpen(true)}
+                className="p-6 rounded-2xl bg-slate-950/60 border-2 border-dashed border-slate-800/80 hover:border-emerald-500/50 cursor-pointer text-center text-slate-400 space-y-1.5 transition"
+              >
+                <Dumbbell className="w-8 h-8 mx-auto text-slate-600 mb-1" />
+                <p className="text-xs font-semibold text-slate-300">Toca para seleccionar ejercicios</p>
+                <p className="text-[11px] text-slate-500">Puedes marcar varios a la vez para armar tu rutina en segundos.</p>
               </div>
             ) : (
               <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
@@ -206,16 +218,37 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
                       className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5"
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2.5">
-                          <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono-numbers font-bold text-[10px] flex items-center justify-center">
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono-numbers font-bold text-[10px] flex items-center justify-center flex-shrink-0">
                             {idx + 1}
                           </span>
-                          <span className="text-sm font-bold text-slate-100">
-                            {exMeta?.name || 'Ejercicio'}
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-                            {exMeta?.category}
-                          </span>
+
+                          {/* Foto miniatura con zoom */}
+                          {exMeta?.machinePhotoUrl && (
+                            <div 
+                              onClick={() => setZoomImage({
+                                url: exMeta.machinePhotoUrl,
+                                title: exMeta.name,
+                                subtitle: `${exMeta.category}`
+                              })}
+                              className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 overflow-hidden flex-shrink-0 cursor-pointer relative group/img"
+                              title="Tocar para ampliar foto"
+                            >
+                              <img src={exMeta.machinePhotoUrl} alt={exMeta.name} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center">
+                                <Eye className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <span className="text-xs sm:text-sm font-bold text-slate-100 block truncate">
+                              {exMeta?.name || 'Ejercicio'}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {exMeta?.category}
+                            </span>
+                          </div>
                         </div>
 
                         <button
@@ -228,7 +261,7 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
                         </button>
                       </div>
 
-                      {/* Configuración rápida de Series, Reps, Kg y Descanso */}
+                      {/* Configuración de Series, Reps, Kg y Descanso */}
                       <div className="grid grid-cols-4 gap-2 text-center text-xs">
                         <div className="bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
                           <span className="text-[10px] text-slate-400 block mb-0.5">Series</span>
@@ -313,13 +346,22 @@ export const CreateRoutineModal: React.FC<CreateRoutineModalProps> = ({
         </form>
       </Modal>
 
-      {/* Modal Selector de Ejercicios */}
+      {/* Modal Selector de Ejercicios en Modo Multiselección */}
       <ExercisePickerModal
         isOpen={isExercisePickerOpen}
         onClose={() => setIsExercisePickerOpen(false)}
-        onSelectExercise={(exId) => {
-          handleAddExercise(exId);
-        }}
+        multiSelect={true}
+        alreadySelectedIds={routineExercises.map(re => re.exerciseId)}
+        onSelectMultiple={handleAddMultipleExercises}
+      />
+
+      {/* Modal de Zoom de Imagen */}
+      <ImageZoomModal
+        isOpen={!!zoomImage}
+        onClose={() => setZoomImage(null)}
+        imageUrl={zoomImage?.url}
+        title={zoomImage?.title || ''}
+        subtitle={zoomImage?.subtitle}
       />
     </>
   );

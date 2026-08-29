@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Camera, Trash2, Plus, Check, Timer, ChevronDown, ChevronUp, History } from 'lucide-react';
+import { Camera, Trash2, Plus, Check, Timer, ChevronDown, ChevronUp, History, Eye } from 'lucide-react';
 import type { WorkoutExercise } from '../../types/workout';
 import { useWorkout } from '../../context/WorkoutContext';
 import { CameraModal } from '../common/CameraModal';
 import { RestOptionsSelector } from './RestOptionsSelector';
+import { ImageZoomModal } from '../common/ImageZoomModal';
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
@@ -28,6 +29,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [showRestOptions, setShowRestOptions] = useState(false);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   const exName = exercise?.exerciseName || 'Ejercicio';
   const exCategory = exercise?.exerciseCategory || 'Pecho';
@@ -53,15 +55,30 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         {/* Cabecera del Ejercicio */}
         <div className="p-3.5 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
           <div className="flex items-center space-x-3 min-w-0">
-            {/* Avatar / Foto de la máquina con botón de cámara */}
+            {/* Avatar / Foto de la máquina con click para ampliar */}
             <div className="relative group flex-shrink-0">
-              <div className="w-13 h-13 rounded-xl bg-slate-950 border border-slate-700 overflow-hidden flex items-center justify-center shadow-inner">
+              <div 
+                onClick={() => {
+                  if (exercise?.exercisePhotoUrl) {
+                    setIsZoomOpen(true);
+                  } else {
+                    setIsCameraOpen(true);
+                  }
+                }}
+                className="w-13 h-13 rounded-xl bg-slate-950 border border-slate-700 overflow-hidden flex items-center justify-center shadow-inner cursor-pointer relative group/avatar"
+                title={exercise?.exercisePhotoUrl ? "Tocar para ampliar foto de máquina" : "Tocar para tomar foto"}
+              >
                 {exercise?.exercisePhotoUrl ? (
-                  <img
-                    src={exercise.exercisePhotoUrl}
-                    alt={exName}
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    <img
+                      src={exercise.exercisePhotoUrl}
+                      alt={exName}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition">
+                      <Eye className="w-4 h-4 text-white" />
+                    </div>
+                  </>
                 ) : (
                   <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-base">
                     {exName.charAt(0)}
@@ -71,7 +88,10 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
               {/* Botón flotante para cambiar foto de la máquina */}
               <button
-                onClick={() => setIsCameraOpen(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCameraOpen(true);
+                }}
                 className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-950/50 transition transform group-hover:scale-110"
                 title="Tomar foto a la máquina de gym"
               >
@@ -251,6 +271,15 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           }
           setIsCameraOpen(false);
         }}
+      />
+
+      {/* Modal de Zoom de Imagen para ver máquina ampliada */}
+      <ImageZoomModal
+        isOpen={isZoomOpen}
+        onClose={() => setIsZoomOpen(false)}
+        imageUrl={exercise?.exercisePhotoUrl}
+        title={exName}
+        subtitle={`${exCategory} • ${targetRest}s descanso`}
       />
     </>
   );
