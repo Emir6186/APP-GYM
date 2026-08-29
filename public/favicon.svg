@@ -1,9 +1,144 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="m6.5 6.5 11 11"/>
-  <path d="m21 21-1-1"/>
-  <path d="m3 3 1 1"/>
-  <path d="m18 22 4-4"/>
-  <path d="m2 6 4-4"/>
-  <path d="m3 10 7-7"/>
-  <path d="m14 21 7-7"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#09131e"/>
+      <stop offset="50%" stop-color="#040911"/>
+      <stop offset="100%" stop-color="#020408"/>
+    </linearGradient>
+
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.25"/>
+      <stop offset="60%" stop-color="#047857" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.4"/>
+      <stop offset="50%" stop-color="#10b981" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#064e3b" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <!-- Metallic Dumbbell Bar Gradient -->
+    <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="25%" stop-color="#64748b"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="75%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+
+    <!-- Emerald Rim Gradient (Discs Thickness / 3D Depth) -->
+    <linearGradient id="emeraldRim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="30%" stop-color="#10b981"/>
+      <stop offset="70%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+
+    <!-- Disc Face Gradient (Dark metallic Navy / Slate with emerald highlight) -->
+    <linearGradient id="discFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#06121e"/>
+    </linearGradient>
+
+    <!-- Inner Collar Gradient -->
+    <linearGradient id="collarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+
+    <filter id="dropGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#10b981" flood-opacity="0.35"/>
+    </filter>
+
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- App Icon Background (Smooth Squircle) -->
+  <rect width="512" height="512" rx="118" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Ambient Glow -->
+  <circle cx="256" cy="256" r="220" fill="url(#centerGlow)"/>
+
+  <!-- Icon Border Accent -->
+  <rect x="2" y="2" width="508" height="508" rx="116" fill="none" stroke="url(#borderGrad)" stroke-width="3"/>
+
+  <!-- Main Dumbbell Artwork Group with 3D Pop -->
+  <g filter="url(#dropGlow)">
+    <g filter="url(#softShadow)">
+      
+      <!-- Central Bar (Grip) -->
+      <rect x="180" y="238" width="152" height="36" rx="8" fill="url(#barGrad)"/>
+      <rect x="200" y="243" width="112" height="26" rx="4" fill="none" stroke="#0f172a" stroke-width="2" stroke-dasharray="4 3" opacity="0.4"/>
+      
+      <!-- Center Bar Highlight Shine -->
+      <rect x="184" y="242" width="144" height="6" rx="3" fill="#ffffff" opacity="0.45"/>
+
+      <!-- ==================== LEFT WEIGHT PLATES ==================== -->
+      
+      <!-- 1. Left Large Disc (Inner) -->
+      <!-- 3D Depth Body / Rim -->
+      <path d="M 188 150 C 204 150 204 362 188 362 L 166 362 C 150 362 150 150 166 150 Z" fill="url(#emeraldRim)"/>
+      <!-- Outer Face -->
+      <ellipse cx="166" cy="256" rx="18" ry="106" fill="url(#discFace)"/>
+      <ellipse cx="166" cy="256" rx="18" ry="106" fill="none" stroke="#34d399" stroke-width="2.5" opacity="0.8"/>
+      <ellipse cx="166" cy="256" rx="10" ry="70" fill="none" stroke="#10b981" stroke-width="1.5" opacity="0.3"/>
+
+      <!-- 2. Left Medium Disc (Middle) -->
+      <!-- 3D Depth Body / Rim -->
+      <path d="M 152 176 C 166 176 166 336 152 336 L 132 336 C 118 336 118 176 132 176 Z" fill="url(#emeraldRim)"/>
+      <!-- Outer Face -->
+      <ellipse cx="132" cy="256" rx="15" ry="80" fill="url(#discFace)"/>
+      <ellipse cx="132" cy="256" rx="15" ry="80" fill="none" stroke="#34d399" stroke-width="2" opacity="0.8"/>
+
+      <!-- 3. Left Small Disc (Outer) -->
+      <!-- 3D Depth Body / Rim -->
+      <path d="M 120 202 C 132 202 132 310 120 310 L 102 310 C 90 310 90 202 102 202 Z" fill="url(#emeraldRim)"/>
+      <!-- Outer Face -->
+      <ellipse cx="102" cy="256" rx="13" ry="54" fill="url(#discFace)"/>
+      <ellipse cx="102" cy="256" rx="13" ry="54" fill="none" stroke="#34d399" stroke-width="2" opacity="0.9"/>
+      <!-- Left End Cap Pin -->
+      <ellipse cx="94" cy="256" rx="5" ry="14" fill="url(#barGrad)"/>
+
+
+      <!-- ==================== RIGHT WEIGHT PLATES ==================== -->
+      
+      <!-- 1. Right Large Disc (Inner) -->
+      <!-- 3D Depth Body / Rim -->
+      <path d="M 324 150 C 308 150 308 362 324 362 L 346 362 C 362 362 362 150 346 150 Z" fill="url(#emeraldRim)"/>
+      <!-- Outer Face -->
+      <ellipse cx="346" cy="256" rx="18" ry="106" fill="url(#discFace)"/>
+      <ellipse cx="346" cy="256" rx="18" ry="106" fill="none" stroke="#34d399" stroke-width="2.5" opacity="0.8"/>
+      <ellipse cx="346" cy="256" rx="10" ry="70" fill="none" stroke="#10b981" stroke-width="1.5" opacity="0.3"/>
+
+      <!-- 2. Right Medium Disc (Middle) -->
+      <!-- 3D Depth Body / Rim -->
+      <path d="M 360 176 C 346 176 346 336 360 336 L 380 336 C 394 336 394 176 380 176 Z" fill="url(#emeraldRim)"/>
+      <!-- Outer Face -->
+      <ellipse cx="380" cy="256" rx="15" ry="80" fill="url(#discFace)"/>
+      <ellipse cx="380" cy="256" rx="15" ry="80" fill="none" stroke="#34d399" stroke-width="2" opacity="0.8"/>
+
+      <!-- 3. Right Small Disc (Outer) -->
+      <!-- 3D Depth Body / Rim -->
+      <path d="M 392 202 C 380 202 380 310 392 310 L 410 310 C 422 310 422 202 410 202 Z" fill="url(#emeraldRim)"/>
+      <!-- Outer Face -->
+      <ellipse cx="410" cy="256" rx="13" ry="54" fill="url(#discFace)"/>
+      <ellipse cx="410" cy="256" rx="13" ry="54" fill="none" stroke="#34d399" stroke-width="2" opacity="0.9"/>
+      <!-- Right End Cap Pin -->
+      <ellipse cx="418" cy="256" rx="5" ry="14" fill="url(#barGrad)"/>
+
+      <!-- Collar Locks (Holding plates to bar) -->
+      <rect x="180" y="232" width="10" height="48" rx="4" fill="url(#collarGrad)"/>
+      <rect x="322" y="232" width="10" height="48" rx="4" fill="url(#collarGrad)"/>
+
+    </g>
+  </g>
+
+  <!-- Specular Reflection Glare on Top Left -->
+  <path d="M 50 118 C 50 80 80 50 118 50 L 394 50 C 432 50 462 80 462 118 C 360 160 160 170 50 118 Z" fill="#ffffff" opacity="0.04"/>
 </svg>
